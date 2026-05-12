@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Stage Lights</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    background: #0c0c0e; color: #eee; user-select: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  h1 { font-size: .85rem; margin: 0; opacity: .55; font-weight: 600;
+       text-transform: uppercase; letter-spacing: .12em; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; align-content: start; }
+  button.scene {
+    padding: 26px 8px; font-size: 1.25rem; border: 0; border-radius: 16px;
+    color: #fff; font-weight: 700; transition: transform .06s, filter .06s;
+  }
+  button.scene:active { transform: scale(.97); filter: brightness(1.5); }
+  button.scene.active { outline: 3px solid #fff; outline-offset: 2px; }
+  #strobe   { color: #000; }
+  #blackout { grid-column: span 2; }
+  .fader { padding: 4px 0 6px; }
+  .fader label { display: flex; justify-content: space-between; align-items: baseline;
+                 margin-bottom: 6px; font-size: .85rem; opacity: .75; }
+  .fader label b { font-size: 1.4rem; opacity: 1; font-variant-numeric: tabular-nums; }
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; height: 14px; border-radius: 7px;
+    background: linear-gradient(90deg, #222, #fff); outline: none;
+  }
+  #tempo { background: linear-gradient(90deg, #1a1530, #ff5a8a); }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 44px; height: 44px; border-radius: 50%;
+    background: #fff; border: 4px solid #0c0c0e; box-shadow: 0 2px 10px rgba(0,0,0,.6);
+  }
+  .tempo-row { display: flex; gap: 12px; align-items: center; }
+  .tempo-row .fader { flex: 1; }
+  #tap {
+    width: 92px; height: 92px; border: 0; border-radius: 50%; flex: none;
+    background: #222; color: #fff; font-weight: 800; font-size: 1.1rem;
+    line-height: 1.1; transition: transform .04s, background .04s;
+  }
+  #tap:active, #tap.flash { transform: scale(.94); background: #ff5a8a; color: #000; }
+  .conn { font-size: .75rem; opacity: .4; text-align: center; }
+</style>
+</head>
+<body>
+<h1>🎸 Stage Lights</h1>
+<div class="grid" id="scenes"></div>
+
+<div class="tempo-row">
+  <button id="tap">TAP<br>TEMPO</button>
+  <div class="fader">
+    <label>Tempo <b><span id="tval">120</span> bpm</b></label>
+    <input type="range" id="tempo" min="60" max="200" value="120">
+  </div>
+</div>
+
+<div class="fader">
+  <label>Master <b><span id="mval">35</span>%</b></label>
+  <input type="range" id="master" min="0" max="100" value="35">
+</div>
+<div class="conn" id="conn">connecting…</div>
+
+<script>
+const SCENES = [
+  ["auto",     "🤖 Auto",     "#2c2c30"],
+  ["warm",     "🟠 Warm",     "#5a3a10"],
+  ["chill",    "🌊 Chill",    "#10355a"],
+  ["pulse",    "💗 Pulse",    "#4a103a"],
+  ["pop",      "🥁 Pop",      "#3a1050"],
+  ["chase",    "➡️ Chase",    "#10402a"],
+  ["uv",       "🔮 UV",       "#280a55"],
+  ["strobe",   "⚡ Strobe",   "#f0f0f0"],
+  ["blackout", "⬛ Blackout", "#5a1010"],
+];
+
+const grid = document.getElementById("scenes");
+const conn = document.getElementById("conn");
+let current = null;
+
+function post(url, body) {
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then(r => { conn.textContent = "● connected"; return r; })
+    .catch(() => { conn.textContent = "✕ connection lost"; });
+}
+
+function markActive(key) {
+  current = key;
+  document.querySelectorAll(".scene").forEach(b =>
+    b.classList.toggle("active", b.id === key));
+}
+
+function setScene(key) {
+  markActive(key);
+  post("/api/scene", { scene: key });
+}
+
+for (const [key, label, bg] of SCENES) {
+  const b = document.createElement("button");
+  b.className = "scene"; b.id = key; b.textContent = label;
+  b.style.background = bg;
+
+  if (key === "strobe") {
+    // Hold-to-fire: press = strobe, release = back to whatever was running.
+    let prev = null, held = false;
+    const down = e => { e.preventDefault(); if (held) return; held = true; prev = current; setScene("strobe"); };
+    const up   = e => { e.preventDefault(); if (!held) return; held = false; if (prev && prev !== "strobe") setScene(prev); };
+    b.addEventListener("pointerdown", down);
+    b.addEventListener("pointerup", up);
+    b.addEventListener("pointercancel", up);
+    b.addEventListener("pointerleave", up);
+    b.addEventListener("contextmenu", e => e.preventDefault());
+  } else {
+    b.addEventListener("click", () => setScene(key));
+  }
+  grid.appendChild(b);
+}
+
+// Throttled fader — send immediately, then at most every THROTTLE ms while
+// dragging, always flush the final value. (A trailing debounce stalls then
+// jumps; this tracks continuously.)
+const THROTTLE = 33;  // ~30 Hz, matches the DMX frame rate
+function throttledFader(rangeEl, valueEl, format, send) {
+  let lastSent = 0, trailTimer = null;
+  const fire = () => { lastSent = performance.now(); send(+rangeEl.value); };
+  rangeEl.addEventListener("input", () => {
+    valueEl.textContent = format(rangeEl.value);
+    clearTimeout(trailTimer);
+    const since = performance.now() - lastSent;
+    if (since >= THROTTLE) fire();
+    else trailTimer = setTimeout(fire, THROTTLE - since);
+  });
+  rangeEl.addEventListener("change", fire);
+  return { set(v) { rangeEl.value = v; valueEl.textContent = format(v); } };
+}
+
+const masterCtl = throttledFader(
+  document.getElementById("master"), document.getElementById("mval"),
+  v => v, v => post("/api/master", { master: v / 100 }));
+
+const tempoCtl = throttledFader(
+  document.getElementById("tempo"), document.getElementById("tval"),
+  v => v, v => post("/api/tempo", { bpm: v }));
+
+// Tap tempo: average the last few intervals, ignore taps > 2.5 s apart
+// (treat as a fresh start). Needs 2+ taps.
+const tapBtn = document.getElementById("tap");
+let taps = [];
+function onTap(e) {
+  e.preventDefault();
+  tapBtn.classList.add("flash");
+  setTimeout(() => tapBtn.classList.remove("flash"), 90);
+  const now = performance.now();
+  if (taps.length && now - taps[taps.length - 1] > 2500) taps = [];  // reset
+  taps.push(now);
+  if (taps.length > 8) taps.shift();
+  if (taps.length >= 2) {
+    const intervals = [];
+    for (let i = 1; i < taps.length; i++) intervals.push(taps[i] - taps[i - 1]);
+    const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const bpm = Math.round(Math.max(60, Math.min(200, 60000 / avg)));
+    tempoCtl.set(bpm);
+    post("/api/tempo", { bpm });
+  }
+}
+tapBtn.addEventListener("pointerdown", onTap);
+tapBtn.addEventListener("contextmenu", e => e.preventDefault());
+
+// Initial sync
+fetch("/api/state").then(r => r.json()).then(s => {
+  markActive(s.scene);
+  masterCtl.set(Math.round(s.master * 100));
+  tempoCtl.set(Math.round(s.bpm));
+  conn.textContent = "● connected";
+}).catch(() => { conn.textContent = "✕ connection lost"; });
+</script>
+</body>
+</html>
