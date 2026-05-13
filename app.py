@@ -17,13 +17,15 @@ from flask import Flask, jsonify, request, send_from_directory
 import scenes
 from enttec import EnttecUSBPro, SimOutput
 from fixtures import CHANNELS, DEFAULT_ADDRESSES, build_rig
-from overlays import OverlayStack, PRIORITY as OVERLAY_NAMES
+from overlays import OverlayStack
 from scheduler import MOODS, SceneScheduler
+from utils import clamp01
 
 FPS = 30
 DEFAULT_MASTER = 0.35  # these fixtures are *bright* — start gentle
 DEFAULT_BPM = 120.0
 GAMMA = 1.8            # makes the master fader feel perceptually linear
+_ZEROS = bytes(512)
 
 app = Flask(__name__, static_folder="static")
 log = logging.getLogger("dmx")
@@ -36,11 +38,13 @@ class Ctx:
         self.lock = threading.Lock()
         self.bpm = DEFAULT_BPM
         self.master = DEFAULT_MASTER
-        self.raw: dict[int, int] | None = None  # test mode
+        self.master_gamma = DEFAULT_MASTER ** GAMMA  # cached for the hot loop
+        self.raw: dict[int, int] | None = None       # test mode
 
     def set_master(self, v):
         with self.lock:
-            self.master = max(0.0, min(1.0, float(v)))
+            self.master = clamp01(float(v))
+            self.master_gamma = self.master ** GAMMA
 
     def set_bpm(self, v):
         with self.lock:
@@ -67,7 +71,6 @@ rig = []
 
 
 def render_loop(out):
-    global _frame_count
     frame = bytearray(512)
     raw_buf = bytearray(512)
     for f in rig:
@@ -82,14 +85,14 @@ def render_loop(out):
         last = t0
 
         if ctx.raw is not None:
-            raw_buf[:] = bytes(512)
+            raw_buf[:] = _ZEROS
             for ch, val in ctx.raw.items():
                 raw_buf[ch - 1] = val
             wire = raw_buf
         else:
             states = scheduler.tick(dt)
             overlays.apply(states)
-            k = ctx.master ** GAMMA
+            k = ctx.master_gamma
             for i, f in enumerate(rig):
                 f.encode(states[i], k, frame)
             wire = frame
@@ -168,11 +171,9 @@ def api_tempo():
 def api_overlay():
     body = request.get_json(silent=True) or {}
     name = body.get("name", "")
-    active = bool(body.get("active", True))
-    if name not in OVERLAY_NAMES:
-        return jsonify(ok=False, error="unknown overlay"), 400
-    if active:
-        overlays.push(name, body.get("args", {}))
+    if bool(body.get("active", True)):
+        if not overlays.push(name, body.get("args", {})):
+            return jsonify(ok=False, error="unknown overlay"), 400
     else:
         overlays.pop(name)
     return jsonify(ok=True, overlays=overlays.active_names())

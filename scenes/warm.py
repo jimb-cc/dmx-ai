@@ -13,7 +13,7 @@ class WarmWash(Scene):
     preferred_duration = (35.0, 70.0)
 
     def on_enter(self):
-        self.phases = [self.rng.random() * math.tau for _ in self.fx]
+        self.phases = self.random_phases()
 
     def tick(self, dt):
         super().tick(dt)
@@ -22,4 +22,3 @@ class WarmWash(Scene):
             d = noise1d(self.t * 0.12, seed=i * 13) * 0.15
             f.set(r=0.78 + 0.20 * k, g=0.20 + 0.18 * k, b=0.0,
                   lime=0.10 + 0.10 * k + d, amber=0.55 + 0.35 * k)
-            f.strobe = 0

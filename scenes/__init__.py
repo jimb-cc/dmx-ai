@@ -64,7 +64,7 @@ _register("lazy_pop", ColorPop, Mutator(time_scale=0.55),
           label="🐌 Lazy Pop", weight=0.7)
 _register("indie_pop", ColorPop, Mutator(palette=_palettes.INDIE),
           label="🍭 Indie Pop")
-_register("reverse_chase", Chase, Mutator(time_scale=1.0, hue_shift_deg=180),
+_register("cool_chase", Chase, Mutator(hue_shift_deg=180),
           label="⬅️ Cool Chase")
 _register("jewel_chase", Chase, Mutator(palette=_palettes.JEWEL),
           label="💎 Jewel Chase", weight=0.8)
@@ -86,16 +86,19 @@ _register("heart_stop", Heartbeat, Mutator(brightness_invert=True),
           label="🖤 Heart Stop", weight=0.3, mood="atmospheric")
 
 
+# Built once — the registry is immutable after import.
+CATALOGUE: list[dict] = [
+    {
+        "name": name,
+        "label": cls.label,
+        "mood": cls.mood,
+        "weight": cls.weight,
+        "is_strobey": cls.is_strobey,
+        "mutated": mut is not None and not mut.is_identity,
+    }
+    for name, (cls, mut) in REGISTRY.items()
+]
+
+
 def catalogue() -> list[dict]:
-    """Metadata for the phone UI."""
-    out = []
-    for name, (cls, mut) in REGISTRY.items():
-        out.append({
-            "name": name,
-            "label": getattr(cls, "label", name),
-            "mood": getattr(cls, "mood", "ambient"),
-            "weight": getattr(cls, "weight", 1.0),
-            "is_strobey": getattr(cls, "is_strobey", False),
-            "mutated": mut is not None and not mut.is_identity,
-        })
-    return out
+    return CATALOGUE

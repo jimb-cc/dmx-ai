@@ -30,4 +30,3 @@ class Embers(Scene):
             k = base + pop
             f.set(r=k * (0.95 - 0.25 * warm), g=k * 0.10 * warm, b=0,
                   amber=k * (0.30 + 0.65 * warm), lime=k * 0.05 * warm)
-            f.strobe = 0

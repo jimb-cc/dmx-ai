@@ -12,11 +12,10 @@ class UVHaze(Scene):
     preferred_duration = (25.0, 50.0)
 
     def on_enter(self):
-        self.phases = [self.rng.random() * math.tau for _ in self.fx]
+        self.phases = self.random_phases()
 
     def tick(self, dt):
         super().tick(dt)
         for i, f in enumerate(self.fx):
             k = 0.5 + 0.5 * math.sin(self.t * 0.5 + self.phases[i])
             f.set(b=0.20 + 0.18 * k, uv=0.65 + 0.30 * k)
-            f.strobe = 0

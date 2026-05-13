@@ -1,8 +1,12 @@
 """Small math/easing/stochastics utilities for scene authoring.
 
-Pure functions, no dependencies. Vendored from the design doc rather than
-pulling in opensimplex/numpy — at four fixtures and 30 fps the visible
-difference between simplex noise and a couple of dephased sine LFOs is nil.
+Pure functions, no dependencies. Vendored rather than pulling in
+opensimplex/numpy — at four fixtures and 30 fps the visible difference
+between simplex noise and a couple of dephased sine LFOs is nil.
+
+This is a scene-author's library: not every function is in use today, but
+they're the standard building blocks for the kinds of scenes this rig runs.
+Trim if the project never grows past the current catalogue.
 """
 
 from __future__ import annotations

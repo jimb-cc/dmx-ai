@@ -29,4 +29,3 @@ class Heartbeat(Scene):
             L = 0.30
         for f in self.fx:
             f.set(r=L, g=L * 0.05, b=L * 0.02)
-            f.strobe = 0

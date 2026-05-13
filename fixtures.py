@@ -58,8 +58,8 @@ class Fixture:
         self.label = label or f"@{address}"
 
     def init_frame(self, frame: bytearray) -> None:
-        """Zero the whole footprint and pin CH1=255, CH9-16=0. Called once
-        at startup and after exiting raw test mode."""
+        """Zero the whole footprint and pin CH1=255. Called once at startup;
+        encode() never writes CH1/9-16, so they stay at these values forever."""
         for i in range(CHANNELS):
             frame[self.base + i] = 0
         frame[self.base + OFF_MASTER] = 255

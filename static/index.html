@@ -178,13 +178,9 @@ const moodRow = document.getElementById("moods");
 const autoBtn = document.getElementById("auto");
 
 function updateStatus() {
-  if (mode === "auto") {
-    const sc = CATALOGUE.find(s => s.name === currentScene);
-    statusEl.textContent = `Auto · ${currentMood} · now: ${sc ? sc.label : currentScene}`;
-  } else {
-    const sc = CATALOGUE.find(s => s.name === currentScene);
-    statusEl.textContent = `Manual · ${sc ? sc.label : currentScene}`;
-  }
+  const sc = CATALOGUE.find(s => s.name === currentScene);
+  const label = sc ? sc.label : currentScene;
+  statusEl.textContent = mode === "auto" ? `Auto · ${currentMood} · now: ${label}` : `Manual · ${label}`;
 }
 
 function renderScenes() {

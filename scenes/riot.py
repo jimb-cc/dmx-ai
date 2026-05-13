@@ -28,5 +28,3 @@ class Riot(Scene):
                 f.set_rgb(*(self.RED if i in self.FRONT else self.BLUE))
             else:
                 f.set_rgb(0, 0, 0)
-            f.lime = f.amber = f.uv = 0.0
-            f.strobe = 0

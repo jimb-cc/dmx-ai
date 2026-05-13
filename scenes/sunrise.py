@@ -14,10 +14,11 @@ RAMP = [
     (0.80, (0.95, 0.30, 0.00, 0.30, 0.80)),   # amber
     (1.00, (1.00, 0.75, 0.40, 0.80, 0.95)),   # warm white
 ]
+RAMP_PAIRS = list(zip(RAMP, RAMP[1:]))
 
 
 def _ramp(p):
-    for (a_t, a_c), (b_t, b_c) in zip(RAMP, RAMP[1:]):
+    for (a_t, a_c), (b_t, b_c) in RAMP_PAIRS:
         if p <= b_t:
             k = (p - a_t) / max(0.001, b_t - a_t)
             return tuple(lerp(a_c[i], b_c[i], k) for i in range(5))
@@ -50,4 +51,3 @@ class SunRise(Scene):
             r, g, b, lime, amber = (0.65, 0.20, 0.0, 0.20, 0.70)
         for f in self.fx:
             f.set(r=r, g=g, b=b, lime=lime, amber=amber)
-            f.strobe = 0

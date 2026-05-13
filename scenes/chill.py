@@ -28,5 +28,3 @@ class SlowFade(Scene):
         for i, f in enumerate(self.fx):
             a, b = self.cur[i], self.nxt[i]
             f.set_rgb(lerp(a[0], b[0], self.k), lerp(a[1], b[1], self.k), lerp(a[2], b[2], self.k))
-            f.lime = f.amber = f.uv = 0.0
-            f.strobe = 0

@@ -49,17 +49,19 @@ class EnttecUSBPro:
             raise RuntimeError("pyserial not installed — `pip install pyserial`")
         self.port_name = port or find_port()
         self.ser = serial.Serial(self.port_name, baudrate=baud, timeout=1)
+        # Pre-built 518-byte wire frame: header(4) + start_code(1) + 512 + end(1).
+        # Only the 512 data bytes change per frame — saves a handful of
+        # allocations and ~1 KB of copying every tick on the Pi.
+        self._msg = bytearray(518)
+        self._msg[0] = START
+        self._msg[1] = LABEL_SEND_DMX
+        self._msg[2:4] = struct.pack("<H", 513)  # length = start code + 512
+        self._msg[4] = 0x00                      # DMX start code
+        self._msg[517] = END
 
     def send(self, universe) -> None:
-        """Send one DMX frame. `universe` is up to 512 bytes of channel data."""
-        data = bytes([0x00]) + bytes(universe[:512])  # 0x00 = DMX start code
-        msg = (
-            bytes([START, LABEL_SEND_DMX])
-            + struct.pack("<H", len(data))
-            + data
-            + bytes([END])
-        )
-        self.ser.write(msg)
+        self._msg[5:517] = universe[:512]
+        self.ser.write(self._msg)
 
     def blackout(self) -> None:
         self.send(bytes(512))

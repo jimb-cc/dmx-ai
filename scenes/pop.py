@@ -34,5 +34,3 @@ class ColorPop(Scene):
             self.next_at = self.t + self.beat_secs(1)
         for i, f in enumerate(self.fx):
             f.set_rgb(*self.colours[i])
-            f.lime = f.amber = f.uv = 0.0
-            f.strobe = 0

@@ -4,21 +4,16 @@ Overlays are leased: each `POST /api/overlay {"name":..., "active":true}`
 sets a TTL of ~1.5s. The phone re-sends every ~1s while a button is held.
 If the phone vanishes (wifi drop, crash, pocket-dial), the lease expires and
 the overlay auto-releases — no stuck strobe at the end of the night.
-
-Priority order, lowest → highest:
-    uv_boost < flash < blinder < strobe < blackout
 """
 
 from __future__ import annotations
 
 import time
+from typing import Callable
 
 from scene import FixtureState
 
 LEASE_TTL = 1.5  # seconds; phone re-sends ~every 1.0s while held
-
-# Render order: lower index = applied first = overridden by later overlays.
-PRIORITY = ("uv_boost", "flash", "blinder", "strobe", "blackout")
 
 
 def apply_uv_boost(states, _args):
@@ -39,8 +34,7 @@ def apply_flash(states, args):
 
 
 def apply_blinder(states, args):
-    """Front pair to full warm white (lime+amber+r). args may carry 'front'
-    list of fixture indices; defaults to [0, 1]."""
+    """Front pair to full warm white. `args` may carry a 'front' index list."""
     front = set(args.get("front", (0, 1)))
     for i, s in enumerate(states):
         if i in front:
@@ -50,7 +44,6 @@ def apply_blinder(states, args):
 
 
 def apply_strobe(states, args):
-    """Full white hardware strobe on top of whatever's running."""
     rate = int(args.get("rate", 230))
     for s in states:
         s.r = s.g = s.b = 1.0
@@ -63,20 +56,22 @@ def apply_blackout(states, _args):
         s.off()
 
 
-_APPLY = {
-    "uv_boost": apply_uv_boost,
-    "flash": apply_flash,
-    "blinder": apply_blinder,
-    "strobe": apply_strobe,
-    "blackout": apply_blackout,
-}
+# Single ordered table: render order = priority order (later overrides earlier).
+_OVERLAYS: tuple[tuple[str, Callable], ...] = (
+    ("uv_boost", apply_uv_boost),
+    ("flash", apply_flash),
+    ("blinder", apply_blinder),
+    ("strobe", apply_strobe),
+    ("blackout", apply_blackout),
+)
+PRIORITY = tuple(name for name, _ in _OVERLAYS)
+_APPLY = dict(_OVERLAYS)
 
 
 class OverlayStack:
     """Tracks active leased overlays and applies them in priority order."""
 
     def __init__(self):
-        # name -> (expiry_monotonic, args_dict)
         self._active: dict[str, tuple[float, dict]] = {}
 
     def push(self, name: str, args: dict | None = None) -> bool:
@@ -93,13 +88,17 @@ class OverlayStack:
         return [n for n in PRIORITY if n in self._active]
 
     def apply(self, states: list[FixtureState]) -> None:
+        if not self._active:  # hot path: usually nothing held
+            return
         self._gc()
-        for name in PRIORITY:
+        for name, fn in _OVERLAYS:
             entry = self._active.get(name)
             if entry is not None:
-                _APPLY[name](states, entry[1])
+                fn(states, entry[1])
 
     def _gc(self) -> None:
+        if not self._active:
+            return
         now = time.monotonic()
         stale = [n for n, (exp, _) in self._active.items() if exp < now]
         for n in stale:

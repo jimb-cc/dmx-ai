@@ -28,5 +28,3 @@ class HardCuts(Scene):
                 f.set_rgb(*self.COL_BACK)
             else:
                 f.set_rgb(0, 0, 0)
-            f.lime = f.amber = f.uv = 0.0
-            f.strobe = 0

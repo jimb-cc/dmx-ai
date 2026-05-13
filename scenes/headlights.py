@@ -22,4 +22,3 @@ class Headlights(Scene):
                 f.set(r=swell, g=swell * 0.85, b=swell * 0.95, lime=swell * 0.6)
             else:
                 f.set(r=swell * 0.55, g=swell * 0.18, b=0.0, amber=swell * 0.7)
-            f.strobe = 0

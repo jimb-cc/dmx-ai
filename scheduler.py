@@ -27,7 +27,11 @@ XFADE_SECONDS = 2.5
 RECENCY_BUFFER = 4
 RECENCY_PENALTY = 4.0  # weight ÷ (1 + penalty * appearances)
 
-MOODS = ("mixed", "ambient", "driving", "spectacle", "atmospheric", "nature", "glitch")
+# "mixed" is the no-filter default. The rest must have at least one scene
+# tagged with them, or auto-rotation in that mood will stall.
+MOODS = ("mixed", "ambient", "driving", "spectacle", "atmospheric")
+STROBEY_OK_MOODS = ("driving", "glitch")
+NEVER_AUTO = "blackout"
 
 
 class SceneScheduler:
@@ -44,15 +48,21 @@ class SceneScheduler:
         self._auto_until = 0.0
 
         self.current: Scene | None = None
-        self.current_name = default_scene
         self.outgoing: Scene | None = None
-        self.outgoing_name = ""
         self._xfade_t = 1.0                # 1.0 = no crossfade in progress
         self._xfade_dur = XFADE_SECONDS
 
         self.blended = [FixtureState() for _ in range(n_fixtures)]
 
         self._make_current(default_scene)
+
+    @property
+    def current_name(self) -> str:
+        return self.current.name if self.current else ""
+
+    @property
+    def outgoing_name(self) -> str:
+        return self.outgoing.name if self.outgoing else ""
 
     # ------------------------------------------------------------------ API
 
@@ -93,7 +103,6 @@ class SceneScheduler:
                 if self._xfade_t >= 1.0:
                     self.outgoing.on_exit()
                     self.outgoing = None
-                    self.outgoing_name = ""
             elif self.current is not None:
                 for i in range(self.n):
                     self.blended[i].copy_from(self.current.fx[i])
@@ -121,28 +130,22 @@ class SceneScheduler:
 
     def _make_current(self, name: str) -> None:
         self.current = self._instantiate(name)
-        self.current_name = name
         self.outgoing = None
-        self.outgoing_name = ""
         self._xfade_t = 1.0
         self._recency.append(name)
         if self.mode == "auto":
             self._schedule_next_auto()
 
     def _start_crossfade(self, name: str, dur: float) -> None:
-        # Drop any in-progress outgoing scene; the new crossfade starts from
-        # the *current blended* state rather than a half-faded outgoing.
         prev = self.current
         if prev is not None and self.outgoing is not None:
-            # Snapshot the current blend into the outgoing buffer so the new
+            # Mid-crossfade switch: snapshot the current blend so the new
             # fade starts visually where we are, not from the half-finished
             # outgoing scene.
             for i in range(self.n):
                 prev.fx[i].copy_from(self.blended[i])
         self.outgoing = prev
-        self.outgoing_name = self.current_name
         self.current = self._instantiate(name)
-        self.current_name = name
         self._xfade_dur = max(0.05, dur)
         self._xfade_t = 0.0
         self._recency.append(name)
@@ -150,26 +153,22 @@ class SceneScheduler:
             self._schedule_next_auto()
 
     def _schedule_next_auto(self) -> None:
-        cls, _ = self.registry[self.current_name]
-        lo, hi = getattr(cls, "preferred_duration", (25.0, 45.0))
+        lo, hi = self.registry[self.current_name][0].preferred_duration
         self._auto_until = time.monotonic() + random.uniform(lo, hi)
 
     def _pick_auto(self) -> str | None:
         candidates = []
         weights = []
+        cur = self.current_name
         for name, (cls, _mut) in self.registry.items():
-            if name == "blackout":
+            if name in (NEVER_AUTO, cur):
                 continue
-            if getattr(cls, "is_strobey", False) and self.auto_mood not in ("driving", "glitch"):
+            if cls.is_strobey and self.auto_mood not in STROBEY_OK_MOODS:
                 continue
-            mood = getattr(cls, "mood", "ambient")
-            if self.auto_mood != "mixed" and mood != self.auto_mood:
+            if self.auto_mood != "mixed" and cls.mood != self.auto_mood:
                 continue
-            if name == self.current_name:
-                continue  # never repeat back-to-back
-            w = float(getattr(cls, "weight", 1.0))
             recency_hits = sum(1 for r in self._recency if r == name)
-            w /= (1.0 + RECENCY_PENALTY * recency_hits)
+            w = cls.weight / (1.0 + RECENCY_PENALTY * recency_hits)
             if w > 0:
                 candidates.append(name)
                 weights.append(w)

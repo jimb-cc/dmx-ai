@@ -34,5 +34,3 @@ class Chase(Scene):
                 f.set_rgb(*(c / 5.0 for c in self.col))
             else:
                 f.set_rgb(0, 0, 0)
-            f.lime = f.amber = f.uv = 0.0
-            f.strobe = 0

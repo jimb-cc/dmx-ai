@@ -31,4 +31,3 @@ class Marquee(Scene):
                 f.set(r=0.25, g=0.08, b=0.0, amber=0.30)
             else:
                 f.set(r=0.06, g=0.02, b=0.0, amber=0.08)
-            f.strobe = 0

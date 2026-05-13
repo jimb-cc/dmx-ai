@@ -11,14 +11,11 @@ They let one scene class produce several catalogue entries.
 
 from __future__ import annotations
 
+import math
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from utils import clamp01, hue_shift_rgb
-
-
-# Channel names that crossfade and that mutators touch.
-COLOUR_FIELDS = ("r", "g", "b", "lime", "amber", "uv")
 
 
 @dataclass
@@ -39,19 +36,7 @@ class FixtureState:
         self.lime, self.amber, self.uv = clamp01(lime), clamp01(amber), clamp01(uv)
 
     def set_rgb(self, r: float, g: float, b: float) -> None:
-        self.r, self.g, self.b = clamp01(r), clamp01(g), clamp01(b)
-
-    def add(self, r=0.0, g=0.0, b=0.0, lime=0.0, amber=0.0, uv=0.0) -> None:
-        self.r = clamp01(self.r + r)
-        self.g = clamp01(self.g + g)
-        self.b = clamp01(self.b + b)
-        self.lime = clamp01(self.lime + lime)
-        self.amber = clamp01(self.amber + amber)
-        self.uv = clamp01(self.uv + uv)
-
-    def scale(self, k: float) -> None:
-        for f in COLOUR_FIELDS:
-            setattr(self, f, clamp01(getattr(self, f) * k))
+        self.set(r, g, b)
 
     def off(self) -> None:
         self.r = self.g = self.b = self.lime = self.amber = self.uv = 0.0
@@ -81,7 +66,7 @@ class Mutator:
     """Cheap variant generator: hue-rotate, time-scale, invert, palette-swap."""
 
     hue_shift_deg: float = 0.0
-    time_scale: float = 1.0          # negative reverses; <1 slower; >1 faster
+    time_scale: float = 1.0          # speeds up (>1) or slows down (<1)
     brightness_invert: bool = False
     palette: list | None = None      # overrides scene's self.palette if set
 
@@ -108,22 +93,25 @@ class Scene:
     """Base class. Subclasses set the class attrs and implement `tick(dt)`."""
 
     name: str = "scene"
-    label: str = ""                        # short UI label, defaults to name
-    mood: str = "ambient"                  # ambient|driving|spectacle|atmospheric|nature|glitch
-    weight: float = 1.0                    # auto-rotation weight
+    label: str = "scene"
+    mood: str = "ambient"            # one of scheduler.MOODS (minus "mixed")
+    weight: float = 1.0              # auto-rotation weight; 0 = never auto-picked
     preferred_duration: tuple[float, float] = (25.0, 45.0)
-    is_strobey: bool = False               # exclude from auto unless mood=driving
-    palette: list = field(default_factory=list)
+    is_strobey: bool = False         # excluded from auto unless mood is driving/glitch
+    palette: list | tuple = ()
 
     def __init__(self, n_fixtures: int, rng: random.Random, ctx,
                  mutator: Mutator | None = None):
         self.fx = [FixtureState() for _ in range(n_fixtures)]
         self.rng = rng
-        self.ctx = ctx        # exposes .bpm
+        self.ctx = ctx               # exposes .bpm
         self.t = 0.0
         self.mutator = mutator or Mutator()
         if self.mutator.palette is not None:
             self.palette = self.mutator.palette
+        # Cache mutator behaviour — checked every frame, immutable after init.
+        self._dt_scale = abs(self.mutator.time_scale)
+        self._mut_active = not self.mutator.is_identity
         self.on_enter()
 
     # --- subclass hooks ---------------------------------------------------
@@ -141,17 +129,20 @@ class Scene:
     # --- driven by the scheduler -----------------------------------------
 
     def step(self, dt: float) -> None:
-        """Apply time scaling, run tick(), apply mutators."""
-        ts = self.mutator.time_scale
-        self.tick(dt * abs(ts) if ts != 1.0 else dt)
-        if not self.mutator.is_identity:
+        # Strobe is opt-in per frame; reset before tick so scenes that want
+        # it set it explicitly and the rest never have to think about it.
+        for f in self.fx:
+            f.strobe = 0
+        self.tick(dt * self._dt_scale)
+        if self._mut_active:
             self.mutator.apply(self.fx)
 
     # --- helpers for subclasses ------------------------------------------
 
     @property
     def bpm(self) -> float:
-        return max(30.0, min(240.0, float(getattr(self.ctx, "bpm", 120.0))))
+        # ctx.bpm is already clamped at the API boundary.
+        return float(getattr(self.ctx, "bpm", 120.0))
 
     def beat_secs(self, beats: float = 1.0) -> float:
         return (60.0 / self.bpm) * beats
@@ -159,3 +150,6 @@ class Scene:
     def all(self, fn) -> None:
         for f in self.fx:
             fn(f)
+
+    def random_phases(self) -> list[float]:
+        return [self.rng.random() * math.tau for _ in self.fx]

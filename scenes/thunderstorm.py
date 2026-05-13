@@ -25,7 +25,6 @@ class Thunderstorm(Scene):
             g = 0.02 + 0.06 * (1 - n)
             b = 0.30 + 0.45 * m
             f.set(r=r, g=g, b=b, uv=0.10 + 0.15 * n)
-            f.strobe = 0
 
         # Lightning: Poisson event ~10s mean, picks a random fixture
         if poisson_event(self.rng, dt, mean_interval=10.0):

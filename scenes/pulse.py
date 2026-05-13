@@ -29,5 +29,3 @@ class Pulse(Scene):
         k = max(0.15, math.exp(-phase * 4.0))
         for f in self.fx:
             f.set_rgb(self.col[0] * k, self.col[1] * k, self.col[2] * k)
-            f.lime = f.amber = f.uv = 0.0
-            f.strobe = 0
