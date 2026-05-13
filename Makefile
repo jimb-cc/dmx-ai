@@ -11,7 +11,8 @@ run:
 
 deploy:
 	rsync -avz --delete \
-	  --exclude '__pycache__' --exclude '.git' --exclude '*.pyc' --exclude 'docs/' \
+	  --exclude '__pycache__' --exclude '.git' --exclude '*.pyc' \
+	  --exclude 'docs/' --exclude '.claude/' --exclude '.DS_Store' \
 	  ./ $(PI):$(DEST)/
 	ssh $(PI) 'sudo systemctl restart dmx-lights || true'
 
