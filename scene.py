@@ -61,6 +61,21 @@ def lerp_states(a: FixtureState, b: FixtureState, k: float, out: FixtureState) -
     out.strobe = b.strobe if k >= 1.0 else (a.strobe if k <= 0.0 else 0)
 
 
+def lift_floor(states: list[FixtureState], floor: float) -> None:
+    """Remap each visible colour channel from [0,1] to [floor,1] so the rig
+    never goes fully dark on a pulse/pop scene. UV is left alone — adding UV
+    to the ambient floor reads as a purple haze, not 'the band is lit'."""
+    if floor <= 0.0:
+        return
+    span = 1.0 - floor
+    for s in states:
+        s.r = floor + s.r * span
+        s.g = floor + s.g * span
+        s.b = floor + s.b * span
+        s.lime = floor + s.lime * span
+        s.amber = floor + s.amber * span
+
+
 @dataclass
 class Mutator:
     """Cheap variant generator: hue-rotate, time-scale, invert, palette-swap."""
@@ -98,6 +113,7 @@ class Scene:
     weight: float = 1.0              # auto-rotation weight; 0 = never auto-picked
     preferred_duration: tuple[float, float] = (25.0, 45.0)
     is_strobey: bool = False         # excluded from auto unless mood is driving/glitch
+    respects_floor: bool = True      # False → floor lift skipped (blackout)
     palette: list | tuple = ()
 
     def __init__(self, n_fixtures: int, rng: random.Random, ctx,

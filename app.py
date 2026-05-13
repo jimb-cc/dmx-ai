@@ -18,11 +18,13 @@ import scenes
 from enttec import EnttecUSBPro, SimOutput
 from fixtures import CHANNELS, DEFAULT_ADDRESSES, build_rig
 from overlays import OverlayStack
+from scene import lift_floor
 from scheduler import MOODS, SceneScheduler
 from utils import clamp01
 
 FPS = 30
 DEFAULT_MASTER = 0.35  # these fixtures are *bright* — start gentle
+DEFAULT_FLOOR = 0.12   # min ambient lift so the band is never in the dark
 DEFAULT_BPM = 120.0
 GAMMA = 1.8            # makes the master fader feel perceptually linear
 _ZEROS = bytes(512)
@@ -32,19 +34,24 @@ log = logging.getLogger("dmx")
 
 
 class Ctx:
-    """Shared mutable knobs: bpm, master. Read by scenes via scheduler."""
+    """Shared mutable knobs: bpm, master, floor. Read by scenes via scheduler."""
 
     def __init__(self):
         self.lock = threading.Lock()
         self.bpm = DEFAULT_BPM
         self.master = DEFAULT_MASTER
         self.master_gamma = DEFAULT_MASTER ** GAMMA  # cached for the hot loop
+        self.floor = DEFAULT_FLOOR
         self.raw: dict[int, int] | None = None       # test mode
 
     def set_master(self, v):
         with self.lock:
             self.master = clamp01(float(v))
             self.master_gamma = self.master ** GAMMA
+
+    def set_floor(self, v):
+        with self.lock:
+            self.floor = clamp01(float(v))
 
     def set_bpm(self, v):
         with self.lock:
@@ -91,6 +98,8 @@ def render_loop(out):
             wire = raw_buf
         else:
             states = scheduler.tick(dt)
+            # Floor lift before overlays so a held blackout still goes dark.
+            lift_floor(states, ctx.floor * scheduler.floor_k)
             overlays.apply(states)
             k = ctx.master_gamma
             for i, f in enumerate(rig):
@@ -130,6 +139,7 @@ def api_state():
     return jsonify(
         **s,
         master=ctx.master,
+        floor=ctx.floor,
         bpm=ctx.bpm,
         overlays=overlays.active_names(),
         moods=list(MOODS),
@@ -158,6 +168,13 @@ def api_master():
     val = (request.get_json(silent=True) or {}).get("master", ctx.master)
     ctx.set_master(val)
     return jsonify(ok=True, master=ctx.master)
+
+
+@app.post("/api/floor")
+def api_floor():
+    val = (request.get_json(silent=True) or {}).get("floor", ctx.floor)
+    ctx.set_floor(val)
+    return jsonify(ok=True, floor=ctx.floor)
 
 
 @app.post("/api/tempo")

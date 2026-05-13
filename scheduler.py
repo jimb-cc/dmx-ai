@@ -20,7 +20,7 @@ import time
 from collections import deque
 
 from scene import FixtureState, Scene, lerp_states
-from utils import in_out_sine
+from utils import in_out_sine, lerp
 
 
 XFADE_SECONDS = 2.5
@@ -53,6 +53,9 @@ class SceneScheduler:
         self._xfade_dur = XFADE_SECONDS
 
         self.blended = [FixtureState() for _ in range(n_fixtures)]
+        # 0..1 multiplier on the configured floor — crossfades to 0 when
+        # entering Blackout so the floor doesn't keep the rig glowing.
+        self.floor_k = 1.0
 
         self._make_current(default_scene)
 
@@ -63,6 +66,10 @@ class SceneScheduler:
     @property
     def outgoing_name(self) -> str:
         return self.outgoing.name if self.outgoing else ""
+
+    @staticmethod
+    def _floor_of(scene: Scene | None) -> float:
+        return 1.0 if (scene is not None and scene.respects_floor) else 0.0
 
     # ------------------------------------------------------------------ API
 
@@ -100,12 +107,14 @@ class SceneScheduler:
                 k = in_out_sine(self._xfade_t)
                 for i in range(self.n):
                     lerp_states(self.outgoing.fx[i], self.current.fx[i], k, self.blended[i])
+                self.floor_k = lerp(self._floor_of(self.outgoing), self._floor_of(self.current), k)
                 if self._xfade_t >= 1.0:
                     self.outgoing.on_exit()
                     self.outgoing = None
             elif self.current is not None:
                 for i in range(self.n):
                     self.blended[i].copy_from(self.current.fx[i])
+                self.floor_k = self._floor_of(self.current)
 
             return self.blended
 

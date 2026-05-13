@@ -94,11 +94,14 @@
   .fader label { display: flex; justify-content: space-between; align-items: baseline;
                  margin-bottom: 4px; font-size: .8rem; opacity: .7; }
   .fader label b { font-size: 1.25rem; opacity: 1; font-variant-numeric: tabular-nums; }
+  .faders { display: flex; gap: 18px; }
+  .faders .fader { flex: 1; }
   input[type=range] {
     -webkit-appearance: none; width: 100%; height: 12px; border-radius: 6px;
     background: linear-gradient(90deg, #222, #fff); outline: none;
   }
   #tempo { background: linear-gradient(90deg, #1a1530, #ff5a8a); }
+  #floor { background: linear-gradient(90deg, #111, #b88a30); }
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; width: 40px; height: 40px; border-radius: 50%;
     background: #fff; border: 4px solid #16161a; box-shadow: 0 2px 8px rgba(0,0,0,.6);
@@ -134,9 +137,15 @@
 
 <div class="panel">
   <div class="overlays" id="overlays"></div>
-  <div class="fader">
-    <label>Master <b><span id="mval">35</span>%</b></label>
-    <input type="range" id="master" min="0" max="100" value="35">
+  <div class="faders">
+    <div class="fader">
+      <label>Master <b><span id="mval">35</span>%</b></label>
+      <input type="range" id="master" min="0" max="100" value="35">
+    </div>
+    <div class="fader">
+      <label>Floor <b><span id="fval">12</span>%</b></label>
+      <input type="range" id="floor" min="0" max="70" value="12">
+    </div>
   </div>
   <div class="conn" id="conn"></div>
 </div>
@@ -295,6 +304,9 @@ document.documentElement.style.setProperty("--flash-col", "rgb(255,48,96)");
 const masterCtl = throttledFader(
   document.getElementById("master"), document.getElementById("mval"),
   v => post("/api/master", { master: v / 100 }));
+const floorCtl = throttledFader(
+  document.getElementById("floor"), document.getElementById("fval"),
+  v => post("/api/floor", { floor: v / 100 }));
 const tempoCtl = throttledFader(
   document.getElementById("tempo"), document.getElementById("tval"),
   v => post("/api/tempo", { bpm: v }));
@@ -327,6 +339,7 @@ function syncState(s) {
   mode = s.mode; currentScene = s.scene; currentMood = s.mood;
   autoBtn.classList.toggle("active", mode === "auto");
   masterCtl.set(Math.round(s.master * 100));
+  floorCtl.set(Math.round(s.floor * 100));
   tempoCtl.set(Math.round(s.bpm));
   renderMoods(); renderScenes(); updateStatus();
   conn.textContent = "● connected";
