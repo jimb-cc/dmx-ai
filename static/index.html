@@ -2,188 +2,344 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Stage Lights</title>
 <style>
-  :root { color-scheme: dark; }
+  :root { color-scheme: dark; --safe-bottom: env(safe-area-inset-bottom, 0px); }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   html, body { height: 100%; }
   body {
-    margin: 0; padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
-    background: #0c0c0e; color: #eee; user-select: none;
+    margin: 0; background: #0c0c0e; color: #eee; user-select: none;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    display: flex; flex-direction: column; gap: 14px;
+    display: flex; flex-direction: column;
   }
-  h1 { font-size: .85rem; margin: 0; opacity: .55; font-weight: 600;
+
+  /* Scrollable upper area */
+  .scroll { flex: 1; overflow-y: auto; padding: max(14px, env(safe-area-inset-top)) 14px 18px; }
+
+  h1 { font-size: .8rem; margin: 0 0 4px; opacity: .5; font-weight: 600;
        text-transform: uppercase; letter-spacing: .12em; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; align-content: start; }
-  button.scene {
-    padding: 26px 8px; font-size: 1.25rem; border: 0; border-radius: 16px;
-    color: #fff; font-weight: 700; transition: transform .06s, filter .06s;
+  #status { font-size: .85rem; opacity: .7; min-height: 1.2em; margin-bottom: 12px;
+            font-variant-numeric: tabular-nums; }
+
+  /* Auto + mood pills */
+  #auto-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  #auto {
+    padding: 14px 20px; font-size: 1.1rem; border: 0; border-radius: 12px;
+    background: #2c2c30; color: #fff; font-weight: 700; flex: none;
   }
-  button.scene:active { transform: scale(.97); filter: brightness(1.5); }
-  button.scene.active { outline: 3px solid #fff; outline-offset: 2px; }
-  #strobe   { color: #000; }
-  #blackout { grid-column: span 2; }
-  .fader { padding: 4px 0 6px; }
+  #auto.active { background: #fff; color: #000; }
+  .moods { display: flex; gap: 6px; overflow-x: auto; flex: 1; padding: 2px 0; }
+  .moods::-webkit-scrollbar { display: none; }
+  .mood {
+    padding: 8px 14px; border: 1px solid #333; border-radius: 999px; flex: none;
+    background: transparent; color: #aaa; font-size: .82rem; font-weight: 600;
+    text-transform: capitalize;
+  }
+  .mood.active { background: #2c2c30; color: #fff; border-color: #555; }
+
+  /* Scene grid */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 14px; }
+  button.scene {
+    padding: 18px 8px; font-size: 1.05rem; border: 0; border-radius: 13px;
+    background: #1d1d22; color: #ddd; font-weight: 600;
+    transition: transform .05s, filter .05s; text-align: left;
+  }
+  button.scene small { display: block; font-size: .65rem; opacity: .45;
+                       text-transform: uppercase; letter-spacing: .08em; margin-top: 3px; }
+  button.scene:active { transform: scale(.97); filter: brightness(1.6); }
+  button.scene.active { outline: 2.5px solid #fff; outline-offset: 2px; background: #2c2c30; color: #fff; }
+  button.scene.mut { border-left: 3px solid #555; }
+
+  /* Tempo + flash swatches */
+  .section-label { font-size: .7rem; opacity: .45; text-transform: uppercase;
+                   letter-spacing: .1em; margin: 14px 0 6px; }
+  .swatches { display: flex; gap: 8px; }
+  .swatch { width: 48px; height: 48px; border-radius: 10px; border: 3px solid transparent; flex: none; }
+  .swatch.active { border-color: #fff; }
+  .tempo-row { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
+  .tempo-row .fader { flex: 1; }
+  #tap {
+    width: 76px; height: 76px; border: 0; border-radius: 50%; flex: none;
+    background: #222; color: #fff; font-weight: 800; font-size: .9rem; line-height: 1.15;
+    transition: transform .04s, background .04s;
+  }
+  #tap:active, #tap.flash { transform: scale(.94); background: #ff5a8a; color: #000; }
+
+  /* Sticky bottom panel: overlays + master */
+  .panel {
+    flex: none; background: #16161a; border-top: 1px solid #222;
+    padding: 12px 14px calc(14px + var(--safe-bottom));
+    box-shadow: 0 -8px 24px rgba(0,0,0,.6);
+  }
+  .overlays { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 12px; }
+  button.ov {
+    aspect-ratio: 1; border: 0; border-radius: 14px; font-size: 1.4rem;
+    background: #26262c; color: #eee; font-weight: 700;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: transform .04s;
+  }
+  button.ov small { font-size: .55rem; opacity: .55; margin-top: 4px;
+                    text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+  button.ov:active, button.ov.held { transform: scale(.93); }
+  #ov-strobe.held   { background: #fff; color: #000; }
+  #ov-uv_boost.held { background: #6020c0; }
+  #ov-blinder.held  { background: #e09020; color: #000; }
+  #ov-flash.held    { background: var(--flash-col, #ff3060); color: #000; }
+  #ov-blackout.held { background: #500; }
+
+  .fader { padding: 2px 0; }
   .fader label { display: flex; justify-content: space-between; align-items: baseline;
-                 margin-bottom: 6px; font-size: .85rem; opacity: .75; }
-  .fader label b { font-size: 1.4rem; opacity: 1; font-variant-numeric: tabular-nums; }
+                 margin-bottom: 4px; font-size: .8rem; opacity: .7; }
+  .fader label b { font-size: 1.25rem; opacity: 1; font-variant-numeric: tabular-nums; }
   input[type=range] {
-    -webkit-appearance: none; width: 100%; height: 14px; border-radius: 7px;
+    -webkit-appearance: none; width: 100%; height: 12px; border-radius: 6px;
     background: linear-gradient(90deg, #222, #fff); outline: none;
   }
   #tempo { background: linear-gradient(90deg, #1a1530, #ff5a8a); }
   input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 44px; height: 44px; border-radius: 50%;
-    background: #fff; border: 4px solid #0c0c0e; box-shadow: 0 2px 10px rgba(0,0,0,.6);
+    -webkit-appearance: none; width: 40px; height: 40px; border-radius: 50%;
+    background: #fff; border: 4px solid #16161a; box-shadow: 0 2px 8px rgba(0,0,0,.6);
   }
-  .tempo-row { display: flex; gap: 12px; align-items: center; }
-  .tempo-row .fader { flex: 1; }
-  #tap {
-    width: 92px; height: 92px; border: 0; border-radius: 50%; flex: none;
-    background: #222; color: #fff; font-weight: 800; font-size: 1.1rem;
-    line-height: 1.1; transition: transform .04s, background .04s;
-  }
-  #tap:active, #tap.flash { transform: scale(.94); background: #ff5a8a; color: #000; }
-  .conn { font-size: .75rem; opacity: .4; text-align: center; }
+  .conn { font-size: .7rem; opacity: .35; text-align: center; margin-top: 6px; }
 </style>
 </head>
 <body>
-<h1>🎸 Stage Lights</h1>
-<div class="grid" id="scenes"></div>
 
-<div class="tempo-row">
-  <button id="tap">TAP<br>TEMPO</button>
-  <div class="fader">
-    <label>Tempo <b><span id="tval">120</span> bpm</b></label>
-    <input type="range" id="tempo" min="60" max="200" value="120">
+<div class="scroll">
+  <h1>🎸 Stage Lights</h1>
+  <div id="status">connecting…</div>
+
+  <div id="auto-row">
+    <button id="auto">🤖 Auto</button>
+    <div class="moods" id="moods"></div>
+  </div>
+
+  <div class="grid" id="scenes"></div>
+
+  <div class="section-label">Flash colour</div>
+  <div class="swatches" id="swatches"></div>
+
+  <div class="section-label">Tempo</div>
+  <div class="tempo-row">
+    <button id="tap">TAP<br>TEMPO</button>
+    <div class="fader">
+      <label>BPM <b><span id="tval">120</span></b></label>
+      <input type="range" id="tempo" min="60" max="200" value="120">
+    </div>
   </div>
 </div>
 
-<div class="fader">
-  <label>Master <b><span id="mval">35</span>%</b></label>
-  <input type="range" id="master" min="0" max="100" value="35">
+<div class="panel">
+  <div class="overlays" id="overlays"></div>
+  <div class="fader">
+    <label>Master <b><span id="mval">35</span>%</b></label>
+    <input type="range" id="master" min="0" max="100" value="35">
+  </div>
+  <div class="conn" id="conn"></div>
 </div>
-<div class="conn" id="conn">connecting…</div>
 
 <script>
-const SCENES = [
-  ["auto",     "🤖 Auto",     "#2c2c30"],
-  ["warm",     "🟠 Warm",     "#5a3a10"],
-  ["chill",    "🌊 Chill",    "#10355a"],
-  ["pulse",    "💗 Pulse",    "#4a103a"],
-  ["pop",      "🥁 Pop",      "#3a1050"],
-  ["chase",    "➡️ Chase",    "#10402a"],
-  ["uv",       "🔮 UV",       "#280a55"],
-  ["strobe",   "⚡ Strobe",   "#f0f0f0"],
-  ["blackout", "⬛ Blackout", "#5a1010"],
-];
-
-const grid = document.getElementById("scenes");
+// ------------------------------------------------------------------ helpers
 const conn = document.getElementById("conn");
-let current = null;
-
 function post(url, body) {
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }).then(r => { conn.textContent = "● connected"; return r; })
-    .catch(() => { conn.textContent = "✕ connection lost"; });
+  return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body) })
+    .then(r => { conn.textContent = "● connected"; return r.json(); })
+    .catch(() => { conn.textContent = "✕ connection lost"; return null; });
 }
 
-function markActive(key) {
-  current = key;
-  document.querySelectorAll(".scene").forEach(b =>
-    b.classList.toggle("active", b.id === key));
-}
-
-function setScene(key) {
-  markActive(key);
-  post("/api/scene", { scene: key });
-}
-
-for (const [key, label, bg] of SCENES) {
-  const b = document.createElement("button");
-  b.className = "scene"; b.id = key; b.textContent = label;
-  b.style.background = bg;
-
-  if (key === "strobe") {
-    // Hold-to-fire: press = strobe, release = back to whatever was running.
-    let prev = null, held = false;
-    const down = e => { e.preventDefault(); if (held) return; held = true; prev = current; setScene("strobe"); };
-    const up   = e => { e.preventDefault(); if (!held) return; held = false; if (prev && prev !== "strobe") setScene(prev); };
-    b.addEventListener("pointerdown", down);
-    b.addEventListener("pointerup", up);
-    b.addEventListener("pointercancel", up);
-    b.addEventListener("pointerleave", up);
-    b.addEventListener("contextmenu", e => e.preventDefault());
-  } else {
-    b.addEventListener("click", () => setScene(key));
-  }
-  grid.appendChild(b);
-}
-
-// Throttled fader — send immediately, then at most every THROTTLE ms while
-// dragging, always flush the final value. (A trailing debounce stalls then
-// jumps; this tracks continuously.)
-const THROTTLE = 33;  // ~30 Hz, matches the DMX frame rate
-function throttledFader(rangeEl, valueEl, format, send) {
+const THROTTLE = 33;
+function throttledFader(rangeEl, valueEl, send) {
   let lastSent = 0, trailTimer = null;
   const fire = () => { lastSent = performance.now(); send(+rangeEl.value); };
   rangeEl.addEventListener("input", () => {
-    valueEl.textContent = format(rangeEl.value);
+    valueEl.textContent = rangeEl.value;
     clearTimeout(trailTimer);
     const since = performance.now() - lastSent;
     if (since >= THROTTLE) fire();
     else trailTimer = setTimeout(fire, THROTTLE - since);
   });
   rangeEl.addEventListener("change", fire);
-  return { set(v) { rangeEl.value = v; valueEl.textContent = format(v); } };
+  return { set(v) { rangeEl.value = v; valueEl.textContent = v; } };
 }
 
+// ------------------------------------------------------------------ state
+let CATALOGUE = [];
+let MOODS = ["mixed"];
+let mode = "auto", currentScene = null, currentMood = "mixed";
+let flashCol = { r: 255, g: 48, b: 96 };
+
+const statusEl = document.getElementById("status");
+const sceneGrid = document.getElementById("scenes");
+const moodRow = document.getElementById("moods");
+const autoBtn = document.getElementById("auto");
+
+function updateStatus() {
+  if (mode === "auto") {
+    const sc = CATALOGUE.find(s => s.name === currentScene);
+    statusEl.textContent = `Auto · ${currentMood} · now: ${sc ? sc.label : currentScene}`;
+  } else {
+    const sc = CATALOGUE.find(s => s.name === currentScene);
+    statusEl.textContent = `Manual · ${sc ? sc.label : currentScene}`;
+  }
+}
+
+function renderScenes() {
+  sceneGrid.replaceChildren();
+  for (const s of CATALOGUE) {
+    if (currentMood !== "mixed" && s.mood !== currentMood && s.name !== "blackout") continue;
+    const b = document.createElement("button");
+    b.className = "scene" + (s.mutated ? " mut" : "") + (s.name === currentScene && mode === "manual" ? " active" : "");
+    b.append(document.createTextNode(s.label));
+    const sub = document.createElement("small"); sub.textContent = s.mood;
+    b.append(sub);
+    b.addEventListener("click", () => {
+      mode = "manual"; currentScene = s.name;
+      autoBtn.classList.remove("active");
+      renderScenes(); updateStatus();
+      post("/api/scene", { scene: s.name });
+    });
+    sceneGrid.appendChild(b);
+  }
+}
+
+function renderMoods() {
+  moodRow.replaceChildren();
+  for (const m of MOODS) {
+    const b = document.createElement("button");
+    b.className = "mood" + (m === currentMood ? " active" : "");
+    b.textContent = m;
+    b.addEventListener("click", () => {
+      currentMood = m;
+      renderMoods(); renderScenes();
+      if (mode === "auto") post("/api/auto", { mood: m });
+    });
+    moodRow.appendChild(b);
+  }
+}
+
+autoBtn.addEventListener("click", () => {
+  mode = "auto";
+  autoBtn.classList.add("active");
+  renderScenes(); updateStatus();
+  post("/api/auto", { mood: currentMood });
+});
+
+// ------------------------------------------------------------------ overlays
+const OVERLAYS = [
+  ["strobe",   "⚡", "Strobe"],
+  ["uv_boost", "🔮", "UV"],
+  ["blinder",  "💡", "Blinder"],
+  ["flash",    "🎨", "Flash"],
+  ["blackout", "⬛", "Black"],
+];
+const ovGrid = document.getElementById("overlays");
+const heldTimers = {};
+
+for (const [key, icon, label] of OVERLAYS) {
+  const b = document.createElement("button");
+  b.className = "ov"; b.id = "ov-" + key;
+  b.append(document.createTextNode(icon));
+  const sub = document.createElement("small"); sub.textContent = label;
+  b.append(sub);
+  const args = () => key === "flash" ? flashCol : {};
+  const send = (active) => post("/api/overlay", { name: key, active, args: args() });
+  const down = e => {
+    e.preventDefault();
+    if (heldTimers[key]) return;
+    b.classList.add("held");
+    send(true);
+    heldTimers[key] = setInterval(() => send(true), 1000);  // lease renewal
+  };
+  const up = e => {
+    e.preventDefault();
+    if (!heldTimers[key]) return;
+    clearInterval(heldTimers[key]); delete heldTimers[key];
+    b.classList.remove("held");
+    send(false);
+  };
+  b.addEventListener("pointerdown", down);
+  b.addEventListener("pointerup", up);
+  b.addEventListener("pointercancel", up);
+  b.addEventListener("pointerleave", up);
+  b.addEventListener("contextmenu", e => e.preventDefault());
+  ovGrid.appendChild(b);
+}
+
+// ------------------------------------------------------------------ flash swatches
+const SWATCHES = [
+  [255, 48, 96],   // hot pink
+  [255, 0, 0],     // red
+  [255, 130, 0],   // orange
+  [0, 255, 70],    // green
+  [0, 180, 255],   // cyan
+  [40, 50, 255],   // blue
+  [180, 0, 255],   // purple
+  [255, 255, 255], // white
+];
+const swRow = document.getElementById("swatches");
+SWATCHES.forEach(([r, g, b], i) => {
+  const el = document.createElement("button");
+  el.className = "swatch" + (i === 0 ? " active" : "");
+  el.style.background = `rgb(${r},${g},${b})`;
+  el.addEventListener("click", () => {
+    flashCol = { r, g, b };
+    document.documentElement.style.setProperty("--flash-col", `rgb(${r},${g},${b})`);
+    document.querySelectorAll(".swatch").forEach(s => s.classList.remove("active"));
+    el.classList.add("active");
+  });
+  swRow.appendChild(el);
+});
+document.documentElement.style.setProperty("--flash-col", "rgb(255,48,96)");
+
+// ------------------------------------------------------------------ faders + tap
 const masterCtl = throttledFader(
   document.getElementById("master"), document.getElementById("mval"),
-  v => v, v => post("/api/master", { master: v / 100 }));
-
+  v => post("/api/master", { master: v / 100 }));
 const tempoCtl = throttledFader(
   document.getElementById("tempo"), document.getElementById("tval"),
-  v => v, v => post("/api/tempo", { bpm: v }));
+  v => post("/api/tempo", { bpm: v }));
 
-// Tap tempo: average the last few intervals, ignore taps > 2.5 s apart
-// (treat as a fresh start). Needs 2+ taps.
 const tapBtn = document.getElementById("tap");
 let taps = [];
-function onTap(e) {
+tapBtn.addEventListener("pointerdown", e => {
   e.preventDefault();
   tapBtn.classList.add("flash");
   setTimeout(() => tapBtn.classList.remove("flash"), 90);
   const now = performance.now();
-  if (taps.length && now - taps[taps.length - 1] > 2500) taps = [];  // reset
+  if (taps.length && now - taps[taps.length - 1] > 2500) taps = [];
   taps.push(now);
   if (taps.length > 8) taps.shift();
   if (taps.length >= 2) {
-    const intervals = [];
-    for (let i = 1; i < taps.length; i++) intervals.push(taps[i] - taps[i - 1]);
-    const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const bpm = Math.round(Math.max(60, Math.min(200, 60000 / avg)));
+    const ints = [];
+    for (let i = 1; i < taps.length; i++) ints.push(taps[i] - taps[i - 1]);
+    const bpm = Math.round(Math.max(60, Math.min(200, 60000 / (ints.reduce((a, b) => a + b) / ints.length))));
     tempoCtl.set(bpm);
     post("/api/tempo", { bpm });
   }
-}
-tapBtn.addEventListener("pointerdown", onTap);
+});
 tapBtn.addEventListener("contextmenu", e => e.preventDefault());
 
-// Initial sync
-fetch("/api/state").then(r => r.json()).then(s => {
-  markActive(s.scene);
+// ------------------------------------------------------------------ init + poll
+function syncState(s) {
+  if (!s) return;
+  CATALOGUE = s.scenes || CATALOGUE;
+  MOODS = s.moods || MOODS;
+  mode = s.mode; currentScene = s.scene; currentMood = s.mood;
+  autoBtn.classList.toggle("active", mode === "auto");
   masterCtl.set(Math.round(s.master * 100));
   tempoCtl.set(Math.round(s.bpm));
+  renderMoods(); renderScenes(); updateStatus();
   conn.textContent = "● connected";
-}).catch(() => { conn.textContent = "✕ connection lost"; });
+}
+fetch("/api/state").then(r => r.json()).then(syncState).catch(() => conn.textContent = "✕ no connection");
+// Light poll so the auto-mode "now playing" stays fresh on a second device.
+setInterval(() => fetch("/api/state").then(r => r.json()).then(s => {
+  if (s && s.scene !== currentScene && mode === "auto") { currentScene = s.scene; updateStatus(); }
+}).catch(() => {}), 5000);
 </script>
 </body>
 </html>

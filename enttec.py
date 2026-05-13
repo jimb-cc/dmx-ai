@@ -86,16 +86,16 @@ class SimOutput:
         for addr in self.addrs:
             base = addr - 1
             master = universe[base] / 255.0
-            # Approximate the visible colour: RGB scaled by master,
-            # with white/amber folded in roughly.
+            # Approximate the visible colour: RGB plus lime/amber/UV folded in.
             r = universe[base + 1]
             g = universe[base + 2]
             b = universe[base + 3]
-            w = universe[base + 4]
-            a = universe[base + 5]
-            r = min(255, r + w * 0.8 + a * 1.0)
-            g = min(255, g + w * 0.8 + a * 0.55)
-            b = min(255, b + w * 0.8)
+            lime = universe[base + 4]
+            amber = universe[base + 5]
+            uv = universe[base + 6]
+            r = min(255, r + lime * 0.55 + amber * 1.00 + uv * 0.30)
+            g = min(255, g + lime * 0.95 + amber * 0.55)
+            b = min(255, b + lime * 0.10 + uv * 0.95)
             r, g, b = (int(c * master) for c in (r, g, b))
             blocks.append(f"\033[48;2;{r};{g};{b}m        \033[0m")
         sys.stdout.write("\r " + "  ".join(blocks) + "  ")

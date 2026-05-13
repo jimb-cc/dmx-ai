@@ -48,20 +48,43 @@ wifi on your phone, go to `http://<pi-ip>/`.
 
 ## Scenes
 
+~28 scenes (15 base + 13 mutator variants), each tagged with a mood for the
+auto-rotation filter:
+
+- **ambient** — Warm, Chill, Embers, Indie Chill, Storm Chill, Ember Pulse
+- **driving** — Pop, Pulse, Chase, Hard Cuts, Riot, Marquee + variants
+- **spectacle** — Sun Rise, Heartbeat, Headlights, Moonrise
+- **atmospheric** — UV, Storm (thunderstorm), Heart Stop
+
+Switching scenes crossfades over 2.5 s. **Auto** mode rotates random scenes
+every 25–90 s with a recency penalty (never repeats back-to-back, avoids the
+last 4) and a mood filter so it doesn't run a slow ambient under a punk number.
+
+## Overlays (hold to fire, sticky bottom row)
+
+These compose **on top of** the running scene — release and the scene is
+still there. Leased: if your phone drops wifi mid-hold, the overlay
+auto-releases within ~1.5 s.
+
 | Button   | What it does |
 |----------|--------------|
-| Auto     | Hands-off — rotates random scenes every 20–40 s. Default on boot. |
-| Warm     | Amber/white wash with slow drift. Between songs. |
-| Chill    | Slow random colour cross-fades. Ballads. |
-| Pulse    | Whole rig breathes in one colour, kick-drum decay. |
-| Pop      | Hard random colour cuts on a beat clock. Rock. |
-| Chase    | Colour ping-pongs across the four lights. |
-| UV       | Deep blue + UV shimmer. Spooky intros. |
-| Strobe   | **Hold to fire.** Full white hardware strobe; releases to previous scene. |
-| Blackout | Everything off, instantly. |
+| ⚡ Strobe   | Full white hardware strobe. |
+| 🔮 UV       | Adds a UV layer. Lights up white shirts. |
+| 💡 Blinder  | Front pair to full warm white. The "big chorus" button. |
+| 🎨 Flash    | All fixtures to the picked swatch colour. |
+| ⬛ Black    | Hard blackout while held. (There's also a Blackout scene for sustained darkness.) |
 
-The **Master** slider sets CH1 (hardware dimmer) on all four fixtures.
-Defaults to 35% — these things are blinding in a small room.
+Priority: blackout > strobe > blinder > flash > UV — so holding blackout +
+strobe gives you blackout, and holding flash + strobe gives a coloured strobe.
+
+## Master & tempo
+
+The **Master** fader scales the colour channels in software (CH1 is pinned
+at 255 — the hardware dimmer is choppy with a dead zone). Gamma-corrected
+so the slider feels linear. Defaults to 35% — these fixtures are blinding.
+
+**Tap tempo** or the **BPM slider** drives the beat-locked scenes (Pop,
+Chase, Pulse, Hard Cuts, Marquee). Changes lock in on the next beat.
 
 ## Tuning
 

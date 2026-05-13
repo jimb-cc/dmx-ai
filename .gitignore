@@ -3,3 +3,6 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
+
+# Internal design docs — not for publishing
+docs/
