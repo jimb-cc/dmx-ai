@@ -26,6 +26,7 @@ from utils import in_out_sine, lerp
 XFADE_SECONDS = 2.5
 RECENCY_BUFFER = 4
 RECENCY_PENALTY = 4.0  # weight ÷ (1 + penalty * appearances)
+AUTO_HUE_CHANCE = 0.5  # auto loads a scene with a random hue this often
 
 # "mixed" is the no-filter default. The rest must have at least one scene
 # tagged with them, or auto-rotation in that mood will stall.
@@ -73,14 +74,20 @@ class SceneScheduler:
 
     # ------------------------------------------------------------------ API
 
-    def goto(self, name: str, xfade: float = XFADE_SECONDS) -> bool:
+    def goto(self, name: str, xfade: float = XFADE_SECONDS, hue: float = 0.0) -> bool:
         """Manually switch to a scene with crossfade. Exits auto mode."""
         if name not in self.registry:
             return False
         with self._lock:
             self.mode = "manual"
-            self._start_crossfade(name, xfade)
+            self._start_crossfade(name, xfade, hue=hue)
         return True
+
+    def set_hue(self, deg: float) -> None:
+        """Live hue shift on the currently running scene."""
+        with self._lock:
+            if self.current is not None:
+                self.current.hue = deg % 360.0
 
     def set_auto(self, mood: str = "mixed") -> None:
         with self._lock:
@@ -96,7 +103,8 @@ class SceneScheduler:
             if self.mode == "auto" and now >= self._auto_until and self._xfade_t >= 1.0:
                 nxt = self._pick_auto()
                 if nxt and nxt != self.current_name:
-                    self._start_crossfade(nxt, XFADE_SECONDS)
+                    hue = random.uniform(0, 360) if random.random() < AUTO_HUE_CHANCE else 0.0
+                    self._start_crossfade(nxt, XFADE_SECONDS, hue=hue)
 
             if self.current:
                 self.current.step(dt)
@@ -126,14 +134,15 @@ class SceneScheduler:
                 "xfading": self.outgoing is not None,
                 "mode": self.mode,
                 "mood": self.auto_mood,
+                "hue": self.current.hue if self.current else 0.0,
             }
 
     # ---------------------------------------------------------------- internals
 
-    def _instantiate(self, name: str) -> Scene:
+    def _instantiate(self, name: str, hue: float = 0.0) -> Scene:
         cls, mutator = self.registry[name]
         rng = random.Random(time.time_ns() ^ hash(name))
-        sc = cls(self.n, rng, self.ctx, mutator=mutator)
+        sc = cls(self.n, rng, self.ctx, mutator=mutator, hue=hue)
         sc.name = name
         return sc
 
@@ -145,7 +154,7 @@ class SceneScheduler:
         if self.mode == "auto":
             self._schedule_next_auto()
 
-    def _start_crossfade(self, name: str, dur: float) -> None:
+    def _start_crossfade(self, name: str, dur: float, hue: float = 0.0) -> None:
         prev = self.current
         if prev is not None and self.outgoing is not None:
             # Mid-crossfade switch: snapshot the current blend so the new
@@ -154,7 +163,7 @@ class SceneScheduler:
             for i in range(self.n):
                 prev.fx[i].copy_from(self.blended[i])
         self.outgoing = prev
-        self.current = self._instantiate(name)
+        self.current = self._instantiate(name, hue=hue)
         self._xfade_dur = max(0.05, dur)
         self._xfade_t = 0.0
         self._recency.append(name)

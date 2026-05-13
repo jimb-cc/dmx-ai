@@ -117,7 +117,7 @@ class Scene:
     palette: list | tuple = ()
 
     def __init__(self, n_fixtures: int, rng: random.Random, ctx,
-                 mutator: Mutator | None = None):
+                 mutator: Mutator | None = None, hue: float = 0.0):
         self.fx = [FixtureState() for _ in range(n_fixtures)]
         self.rng = rng
         self.ctx = ctx               # exposes .bpm
@@ -125,6 +125,10 @@ class Scene:
         self.mutator = mutator or Mutator()
         if self.mutator.palette is not None:
             self.palette = self.mutator.palette
+        # Live hue shift — set by the scheduler at instantiation (0 for manual
+        # loads, random for ~50% of auto loads) and updatable from the UI.
+        # Composes with the mutator's hue shift; only touches RGB.
+        self.hue = hue % 360.0
         # Cache mutator behaviour — checked every frame, immutable after init.
         self._dt_scale = abs(self.mutator.time_scale)
         self._mut_active = not self.mutator.is_identity
@@ -152,6 +156,9 @@ class Scene:
         self.tick(dt * self._dt_scale)
         if self._mut_active:
             self.mutator.apply(self.fx)
+        if self.hue:
+            for f in self.fx:
+                f.r, f.g, f.b = hue_shift_rgb(f.r, f.g, f.b, self.hue)
 
     # --- helpers for subclasses ------------------------------------------
 

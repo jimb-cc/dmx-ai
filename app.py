@@ -177,6 +177,13 @@ def api_floor():
     return jsonify(ok=True, floor=ctx.floor)
 
 
+@app.post("/api/hue")
+def api_hue():
+    deg = float((request.get_json(silent=True) or {}).get("hue", 0.0))
+    scheduler.set_hue(deg)
+    return jsonify(ok=True, hue=scheduler.status()["hue"])
+
+
 @app.post("/api/tempo")
 def api_tempo():
     val = (request.get_json(silent=True) or {}).get("bpm", ctx.bpm)

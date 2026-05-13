@@ -59,6 +59,16 @@
   .swatches { display: flex; gap: 8px; }
   .swatch { width: 48px; height: 48px; border-radius: 10px; border: 3px solid transparent; flex: none; }
   .swatch.active { border-color: #fff; }
+  .hue-row { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
+  .hue-row .fader { flex: 1; }
+  #hue-shuffle, #hue-reset {
+    width: 56px; height: 56px; border: 0; border-radius: 12px; flex: none;
+    background: #222; color: #fff; font-size: 1.3rem; transition: transform .04s;
+  }
+  #hue-shuffle:active, #hue-reset:active { transform: scale(.92); filter: brightness(1.5); }
+  #hue { background: linear-gradient(90deg,
+    hsl(0,90%,55%), hsl(60,90%,55%), hsl(120,90%,55%), hsl(180,90%,55%),
+    hsl(240,90%,55%), hsl(300,90%,55%), hsl(360,90%,55%)); }
   .tempo-row { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
   .tempo-row .fader { flex: 1; }
   #tap {
@@ -121,6 +131,16 @@
   </div>
 
   <div class="grid" id="scenes"></div>
+
+  <div class="section-label">Hue shift — re-colour the running scene</div>
+  <div class="hue-row">
+    <button id="hue-reset" title="reset hue">↺</button>
+    <div class="fader">
+      <label>Hue <b><span id="hval">0</span>°</b></label>
+      <input type="range" id="hue" min="0" max="359" value="0">
+    </div>
+    <button id="hue-shuffle" title="random hue">🎲</button>
+  </div>
 
   <div class="section-label">Flash colour</div>
   <div class="swatches" id="swatches"></div>
@@ -204,6 +224,7 @@ function renderScenes() {
     b.addEventListener("click", () => {
       mode = "manual"; currentScene = s.name;
       autoBtn.classList.remove("active");
+      hueCtl.set(0);                 // new scene loads with default hue
       renderScenes(); updateStatus();
       post("/api/scene", { scene: s.name });
     });
@@ -310,6 +331,16 @@ const floorCtl = throttledFader(
 const tempoCtl = throttledFader(
   document.getElementById("tempo"), document.getElementById("tval"),
   v => post("/api/tempo", { bpm: v }));
+const hueCtl = throttledFader(
+  document.getElementById("hue"), document.getElementById("hval"),
+  v => post("/api/hue", { hue: v }));
+document.getElementById("hue-shuffle").addEventListener("click", () => {
+  const h = Math.floor(Math.random() * 360);
+  hueCtl.set(h); post("/api/hue", { hue: h });
+});
+document.getElementById("hue-reset").addEventListener("click", () => {
+  hueCtl.set(0); post("/api/hue", { hue: 0 });
+});
 
 const tapBtn = document.getElementById("tap");
 let taps = [];
@@ -341,13 +372,18 @@ function syncState(s) {
   masterCtl.set(Math.round(s.master * 100));
   floorCtl.set(Math.round(s.floor * 100));
   tempoCtl.set(Math.round(s.bpm));
+  hueCtl.set(Math.round(s.hue));
   renderMoods(); renderScenes(); updateStatus();
   conn.textContent = "● connected";
 }
 fetch("/api/state").then(r => r.json()).then(syncState).catch(() => conn.textContent = "✕ no connection");
-// Light poll so the auto-mode "now playing" stays fresh on a second device.
+// Light poll so auto-mode's now-playing/hue stay fresh, and a 2nd device tracks.
 setInterval(() => fetch("/api/state").then(r => r.json()).then(s => {
-  if (s && s.scene !== currentScene && mode === "auto") { currentScene = s.scene; updateStatus(); }
+  if (!s) return;
+  if (mode === "auto") {
+    if (s.scene !== currentScene) { currentScene = s.scene; updateStatus(); }
+    hueCtl.set(Math.round(s.hue));
+  }
 }).catch(() => {}), 5000);
 </script>
 </body>
