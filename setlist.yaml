@@ -1,0 +1,178 @@
+name: GravelAxe
+between:
+  scene: warm
+songs:
+- title: All Day And All Of The Night
+  artist: The Kinks
+  section: Set 1
+  scene: pop
+  bpm: 136
+- title: Quo Medley
+  artist: Status Quo
+  section: Set 1
+  scene: marquee
+  bpm: 140
+- title: Just What I Needed
+  artist: The Cars
+  section: Set 1
+  scene: chill
+  bpm: 137
+  hue: 200
+- title: Breakin' The Law
+  artist: Judas Priest
+  section: Set 1
+  scene: riot
+  bpm: 164
+- title: She's Electric
+  artist: Oasis
+  section: Set 1
+  scene: indie_chill
+  bpm: 125
+- title: Don't Fear The Reaper
+  artist: Blue Öyster Cult
+  section: Set 1
+  scene: uv
+  bpm: 141
+- title: Are You Gonna Be My Girl
+  artist: Jet
+  section: Set 1
+  scene: embers
+  bpm: 105
+- title: Run To You
+  artist: Bryan Adams
+  section: Set 1
+  scene: pulse
+  bpm: 127
+  hue: 320
+- title: Vertigo
+  artist: U2
+  section: Set 1
+  scene: heartbeat
+  bpm: 140
+- title: You Ain't Seen Nothing Yet
+  artist: BTO
+  section: Set 1
+  scene: pop
+  bpm: 118
+  hue: 40
+- title: Long Train Runnin'
+  artist: The Doobie Brothers
+  section: Set 1
+  scene: chill
+  bpm: 117
+  hue: 130
+- title: Stones Medley
+  artist: The Rolling Stones
+  section: Set 1
+  scene: jewel_chase
+  bpm: 120
+- title: Stacey's Mom
+  artist: Fountains of Wayne
+  section: Set 1
+  scene: manic_pop
+  bpm: 118
+- title: Tie Your Mother Down
+  artist: Queen
+  section: Set 1
+  scene: marquee
+  bpm: 150
+- title: Rock N Roll Star
+  artist: Oasis
+  section: Set 1
+  scene: sunrise
+  bpm: 138
+- title: Hurry Up Harry
+  artist: Sham 69
+  section: Set 1
+  scene: hardcuts
+  bpm: 140
+- title: The Boys Are Back In Town
+  artist: Thin Lizzy
+  section: Set 2
+  scene: marquee
+  bpm: 162
+- title: Back In The USSR
+  artist: The Beatles
+  section: Set 2
+  scene: chase
+  bpm: 142
+- title: Clash Mash
+  artist: The Clash
+  section: Set 2
+  scene: riot
+  bpm: 140
+- title: Chasing Cars
+  artist: Snow Patrol
+  section: Set 2
+  scene: chill
+  bpm: 104
+  hue: 180
+- title: Town Called Malice
+  artist: The Jam
+  section: Set 2
+  scene: warm
+  bpm: 102
+- title: Going Underground
+  artist: The Jam
+  section: Set 2
+  scene: manic_pop
+  bpm: 181
+- title: Are You Gonna Go My Way
+  artist: Lenny Kravitz
+  section: Set 2
+  scene: ember_pulse
+  bpm: 115
+- title: When The Sun Goes Down
+  artist: Arctic Monkeys
+  section: Set 2
+  scene: storm
+  bpm: 169
+- title: I Bet You Look Good On The Dance Floor
+  artist: Arctic Monkeys
+  section: Set 2
+  scene: uv
+  bpm: 103
+  hue: 60
+- title: Somebody Told Me
+  artist: The Killers
+  section: Set 2
+  scene: pop
+  bpm: 138
+  hue: 300
+- title: You Shook Me All Night Long
+  artist: AC/DC
+  section: Set 2
+  scene: marquee_fast
+  bpm: 128
+- title: Funky Music
+  artist: Wild Cherry
+  section: Set 2
+  scene: pulse
+  bpm: 109
+  hue: 280
+- title: Take Me Out
+  artist: Franz Ferdinand
+  section: Set 2
+  scene: hardcuts
+  bpm: 105
+- title: I'm A Believer
+  artist: The Monkees
+  section: Set 2
+  scene: warm
+  bpm: 161
+  hue: 30
+- title: Highway To Hell
+  artist: AC/DC
+  section: Encore
+  scene: headlights
+  bpm: 116
+- title: Chelsea Dagger
+  artist: The Fratellis
+  section: Encore
+  scene: marquee_fast
+  bpm: 155
+- title: I Believe In A Thing Called Love
+  artist: The Darkness
+  section: Encore
+  scene: jewel_chase
+  bpm: 128

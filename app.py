@@ -20,6 +20,7 @@ from fixtures import CHANNELS, DEFAULT_ADDRESSES, build_rig
 from overlays import OverlayStack
 from scene import lift_floor
 from scheduler import MOODS, SceneScheduler
+from setlist import Setlist
 from utils import clamp01
 
 FPS = 30
@@ -72,8 +73,9 @@ stop_event = threading.Event()
 _last_frame = bytearray(512)
 _frame_count = [0]
 
-# Built in main() once we know the rig size.
+# Built in main() once we know the rig size and setlist path.
 scheduler: SceneScheduler | None = None
+setlist: Setlist | None = None
 rig = []
 
 
@@ -222,16 +224,66 @@ def api_frame():
     )
 
 
+# ----------------------------------------------------------------------- setlist
+
+@app.get("/setlist")
+def setlist_page():
+    return send_from_directory("static", "setlist.html")
+
+
+@app.get("/api/setlist")
+def api_setlist():
+    setlist.load()  # cheap re-read so SSH edits show without a restart
+    return jsonify(**setlist.to_dict(), scenes=scenes.catalogue())
+
+
+def _apply_preset(preset: dict) -> None:
+    scene = preset.get("scene")
+    if scene and scene in scenes.REGISTRY:
+        scheduler.goto(scene, hue=float(preset.get("hue", 0) or 0))
+    if preset.get("bpm"):
+        ctx.set_bpm(preset["bpm"])
+
+
+@app.post("/api/setlist/play")
+def api_setlist_play():
+    idx = int((request.get_json(silent=True) or {}).get("index", -1))
+    song = setlist.song(idx)
+    if song is None:
+        return jsonify(ok=False, error="bad index"), 400
+    setlist.set_current(idx)
+    _apply_preset(song)
+    return jsonify(ok=True, current=idx, scene=scheduler.current_name)
+
+
+@app.post("/api/setlist/between")
+def api_setlist_between():
+    setlist.set_current(-1)
+    _apply_preset(setlist.to_dict().get("between", {}))
+    return jsonify(ok=True, scene=scheduler.current_name)
+
+
+@app.post("/api/setlist/edit")
+def api_setlist_edit():
+    body = request.get_json(silent=True) or {}
+    idx = int(body.get("index", -1))
+    fields = body.get("fields", {})
+    if not setlist.update_song(idx, fields):
+        return jsonify(ok=False, error="bad index"), 400
+    return jsonify(ok=True, **setlist.to_dict())
+
+
 # --------------------------------------------------------------------------- main
 
 def main():
-    global scheduler, rig
+    global scheduler, setlist, rig
     p = argparse.ArgumentParser(description="DMX controller for 4× Betopper LPC1818")
     p.add_argument("--port", help="serial port for the Enttec (auto-detect if omitted)")
     p.add_argument("--sim", action="store_true", help="no hardware — draw to terminal")
     p.add_argument("--http-port", type=int, default=8080)
     p.add_argument("--addresses", default=",".join(map(str, DEFAULT_ADDRESSES)),
                    help="comma-separated DMX base addresses (default 1,17,33,49)")
+    p.add_argument("--setlist", default="setlist.yaml", help="path to a setlist YAML")
     args = p.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -240,6 +292,9 @@ def main():
     rig = build_rig(addresses)
     scheduler = SceneScheduler(len(rig), scenes.REGISTRY, ctx)
     scheduler.set_auto("mixed")
+    setlist = Setlist(args.setlist)
+    log.info("Setlist: %s (%d songs)", setlist.to_dict()["name"],
+             len(setlist.to_dict()["songs"]))
 
     if args.sim:
         out = SimOutput(addresses, CHANNELS)
