@@ -13,9 +13,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sys
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, abort, jsonify, request, send_from_directory
 
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _root not in sys.path:
@@ -34,11 +35,33 @@ FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "frontend", "dist")
 app = Flask(__name__)
 log = logging.getLogger("design")
 
+# IDs / file names must be plain slugs — closes path traversal on the
+# data/ directory writes/deletes.
+_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+
+
+def _safe_slug(s: str) -> str:
+    if not _SLUG_RE.match(s):
+        abort(400, description=f"invalid identifier {s!r}")
+    return s
+
+
+@app.before_request
+def _csrf_guard():
+    """Reject cross-site writes. The Design app writes to the local
+    filesystem, so a malicious page POSTing to localhost:5050 from the
+    user's browser is a real attack. Browsers send Sec-Fetch-Site on
+    fetch(); require same-origin (or absent — non-browser tools)."""
+    if request.method in ("POST", "PUT", "DELETE"):
+        site = request.headers.get("Sec-Fetch-Site")
+        if site not in (None, "same-origin", "none"):
+            abort(403, description="cross-site request blocked")
+
 
 # --------------------------------------------------------------------- profiles
 
 def _profile_path(pid: str) -> str:
-    return os.path.join(PROFILES_DIR, f"{pid}.json")
+    return os.path.join(PROFILES_DIR, f"{_safe_slug(pid)}.json")
 
 
 def _load_profile(pid: str) -> dict | None:
@@ -140,7 +163,9 @@ def api_ofl_search():
 def api_ofl_import():
     body = request.get_json(silent=True) or {}
     key = body.get("key", "")
-    if "/" not in key:
+    # OFL keys are manufacturer-slug/fixture-slug. Validate the shape so
+    # `key` can't steer the request elsewhere on the OFL host.
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*", key):
         return jsonify(error="bad key"), 400
     try:
         raw = ofl.fetch(key)
@@ -157,7 +182,7 @@ def api_ofl_import():
 # ------------------------------------------------------------------------- rigs
 
 def _rig_path(name: str) -> str:
-    return os.path.join(RIGS_DIR, f"{name}.json")
+    return os.path.join(RIGS_DIR, f"{_safe_slug(name)}.json")
 
 
 @app.get("/api/rigs")
@@ -216,7 +241,10 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     log.info("Design app backend on http://localhost:5050  data: %s", DATA)
     log.info("For the UI: cd design/frontend && npm run dev  ->  http://localhost:5173")
-    app.run(host="127.0.0.1", port=5050, debug=True, use_reloader=True)
+    # Werkzeug's debugger is RCE if reachable — never enable it by default,
+    # even on localhost (DNS rebinding can reach 127.0.0.1 from a browser).
+    debug = os.environ.get("DESIGN_DEBUG") == "1"
+    app.run(host="127.0.0.1", port=5050, debug=debug, use_reloader=debug)
 
 
 if __name__ == "__main__":
