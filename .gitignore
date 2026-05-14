@@ -3,6 +3,12 @@ __pycache__/
 .venv/
 venv/
 .DS_Store
+node_modules/
+dist/
 
 # Internal design docs — not for publishing
 docs/
+
+# Show package lands here on the Pi — not in source control
+show/data/
+.claude/

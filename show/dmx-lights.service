@@ -1,6 +1,6 @@
 # /etc/systemd/system/dmx-lights.service
 #
-#   sudo cp dmx-lights.service /etc/systemd/system/
+#   sudo cp show/dmx-lights.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now dmx-lights
 #   journalctl -u dmx-lights -f          # logs
@@ -13,8 +13,8 @@ Wants=dev-ttyUSB0.device
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/dmx-ai
-ExecStart=/usr/bin/python3 /home/pi/dmx-ai/app.py --http-port 80
+WorkingDirectory=/home/pi/dmx-ai/show
+ExecStart=/usr/bin/python3 /home/pi/dmx-ai/show/app.py --http-port 80
 Restart=always
 RestartSec=3
 # Let it bind :80 without root
