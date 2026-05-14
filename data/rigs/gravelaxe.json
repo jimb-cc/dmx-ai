@@ -1,0 +1,24 @@
+{
+  "name": "GravelAxe 4-par + 2-mover",
+  "stage": { "width_m": 5.0, "depth_m": 3.0, "origin": "front-centre" },
+  "fixtures": [
+    { "id": "FL", "label": "Front Left", "profile": "betopper-lpc1818", "mode": "10ch",
+      "universe": 1, "address": 1, "x": -2.0, "y": 0.0, "z": 2.2,
+      "facing_deg": 0, "tilt_deg": -10, "groups": ["front", "left", "pars"] },
+    { "id": "FR", "label": "Front Right", "profile": "betopper-lpc1818", "mode": "10ch",
+      "universe": 1, "address": 17, "x": 2.0, "y": 0.0, "z": 2.2,
+      "facing_deg": 0, "tilt_deg": -10, "groups": ["front", "right", "pars"] },
+    { "id": "BL", "label": "Back Left", "profile": "betopper-lpc1818", "mode": "10ch",
+      "universe": 1, "address": 33, "x": -2.0, "y": 3.0, "z": 2.2,
+      "facing_deg": 180, "tilt_deg": -10, "groups": ["back", "left", "pars"] },
+    { "id": "BR", "label": "Back Right", "profile": "betopper-lpc1818", "mode": "10ch",
+      "universe": 1, "address": 49, "x": 2.0, "y": 3.0, "z": 2.2,
+      "facing_deg": 180, "tilt_deg": -10, "groups": ["back", "right", "pars"] },
+    { "id": "MOV1", "label": "Mover SL", "profile": "mini-ledspot", "mode": "11ch",
+      "universe": 1, "address": 65, "x": -1.5, "y": 3.0, "z": 2.5,
+      "facing_deg": 180, "tilt_deg": -45, "groups": ["movers", "left"] },
+    { "id": "MOV2", "label": "Mover SR", "profile": "mini-ledspot", "mode": "11ch",
+      "universe": 1, "address": 81, "x": 1.5, "y": 3.0, "z": 2.5,
+      "facing_deg": 180, "tilt_deg": -45, "groups": ["movers", "right"] }
+  ]
+}

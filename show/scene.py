@@ -20,32 +20,44 @@ from utils import clamp01, hue_shift_rgb
 
 @dataclass
 class FixtureState:
-    """Floating-point colour state for one fixture, 0..1 linear.
-    The scheduler converts to DMX bytes after crossfade + overlays + master."""
+    """Floating-point fixture state, 0..1 linear (except strobe, raw byte).
+    The scheduler converts to DMX bytes after crossfade + overlays + master.
+    Scenes write colour fields; only mover-aware scenes touch pan/tilt."""
 
     r: float = 0.0
     g: float = 0.0
     b: float = 0.0
+    white: float = 0.0
     lime: float = 0.0
     amber: float = 0.0
     uv: float = 0.0
-    strobe: int = 0  # raw DMX byte; not crossfaded, not mutated
+    strobe: int = 0    # raw DMX byte; not crossfaded, not mutated
+    pan: float = 0.5   # 0..1, 0.5 = centre. Encoder maps to pan + pan_fine.
+    tilt: float = 0.5
+    dimmer: float = 1.0
 
-    def set(self, r=0.0, g=0.0, b=0.0, lime=0.0, amber=0.0, uv=0.0) -> None:
+    def set(self, r=0.0, g=0.0, b=0.0, lime=0.0, amber=0.0, uv=0.0, white=0.0) -> None:
         self.r, self.g, self.b = clamp01(r), clamp01(g), clamp01(b)
         self.lime, self.amber, self.uv = clamp01(lime), clamp01(amber), clamp01(uv)
+        self.white = clamp01(white)
 
     def set_rgb(self, r: float, g: float, b: float) -> None:
         self.set(r, g, b)
 
+    def set_pan_tilt(self, pan: float, tilt: float) -> None:
+        self.pan, self.tilt = clamp01(pan), clamp01(tilt)
+
     def off(self) -> None:
-        self.r = self.g = self.b = self.lime = self.amber = self.uv = 0.0
+        self.r = self.g = self.b = self.white = 0.0
+        self.lime = self.amber = self.uv = 0.0
         self.strobe = 0
+        # leave pan/tilt — a mover going dark shouldn't snap to centre
 
     def copy_from(self, other: "FixtureState") -> None:
-        self.r, self.g, self.b = other.r, other.g, other.b
+        self.r, self.g, self.b, self.white = other.r, other.g, other.b, other.white
         self.lime, self.amber, self.uv = other.lime, other.amber, other.uv
         self.strobe = other.strobe
+        self.pan, self.tilt, self.dimmer = other.pan, other.tilt, other.dimmer
 
 
 def lerp_states(a: FixtureState, b: FixtureState, k: float, out: FixtureState) -> None:
@@ -55,9 +67,13 @@ def lerp_states(a: FixtureState, b: FixtureState, k: float, out: FixtureState) -
     out.r = a.r * inv + b.r * k
     out.g = a.g * inv + b.g * k
     out.b = a.b * inv + b.b * k
+    out.white = a.white * inv + b.white * k
     out.lime = a.lime * inv + b.lime * k
     out.amber = a.amber * inv + b.amber * k
     out.uv = a.uv * inv + b.uv * k
+    out.pan = a.pan * inv + b.pan * k
+    out.tilt = a.tilt * inv + b.tilt * k
+    out.dimmer = a.dimmer * inv + b.dimmer * k
     out.strobe = b.strobe if k >= 1.0 else (a.strobe if k <= 0.0 else 0)
 
 
@@ -72,6 +88,7 @@ def lift_floor(states: list[FixtureState], floor: float) -> None:
         s.r = floor + s.r * span
         s.g = floor + s.g * span
         s.b = floor + s.b * span
+        s.white = floor + s.white * span
         s.lime = floor + s.lime * span
         s.amber = floor + s.amber * span
 
@@ -94,14 +111,14 @@ class Mutator:
         """In-place post-processing of the scene's rendered fixture states."""
         if self.brightness_invert:
             for f in fx:
-                f.r, f.g, f.b = 1.0 - f.r, 1.0 - f.g, 1.0 - f.b
+                f.r, f.g, f.b, f.white = 1.0 - f.r, 1.0 - f.g, 1.0 - f.b, 1.0 - f.white
                 f.lime, f.amber = 1.0 - f.lime, 1.0 - f.amber
                 # leave UV — inverting it is rarely what you want
         if self.hue_shift_deg:
             d = self.hue_shift_deg
             for f in fx:
                 f.r, f.g, f.b = hue_shift_rgb(f.r, f.g, f.b, d)
-                # lime/amber/UV are off the RGB hue circle — leave them
+                # white/lime/amber/UV are off the RGB hue circle — leave them
 
 
 class Scene:

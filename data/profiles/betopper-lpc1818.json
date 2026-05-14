@@ -1,0 +1,44 @@
+{
+  "id": "betopper-lpc1818",
+  "manufacturer": "Betopper",
+  "model": "LPC1818",
+  "type": "par",
+  "physical": { "beam_deg": 25, "watts": 100, "weight_kg": 2.0 },
+  "verified": true,
+  "modes": [
+    {
+      "id": "10ch",
+      "label": "10-channel (display: A001)",
+      "footprint": 16,
+      "channels": [
+        { "offset": 0, "function": "master_dimmer", "default": 255, "lock": true,
+          "label": "Hardware dimmer pinned open; software master scales colours" },
+        { "offset": 1, "function": "red" },
+        { "offset": 2, "function": "green" },
+        { "offset": 3, "function": "blue" },
+        { "offset": 4, "function": "lime", "label": "Manual calls this 'White' — it isn't" },
+        { "offset": 5, "function": "amber" },
+        { "offset": 6, "function": "uv" },
+        { "offset": 7, "function": "strobe" },
+        { "offset": 8, "function": "macro", "default": 0, "lock": true,
+          "label": "0-50 = direct DMX; >50 = built-in programs" },
+        { "offset": 9, "function": "macro_speed", "default": 0, "lock": true },
+        { "offset": 10, "function": "ct_override", "default": 0, "lock": true,
+          "label": "UNDOCUMENTED. Non-zero overrides CH2-7 with a CCT preset." }
+      ]
+    },
+    {
+      "id": "6ch",
+      "label": "6-channel (display: d001)",
+      "footprint": 16,
+      "channels": [
+        { "offset": 0, "function": "red" },
+        { "offset": 1, "function": "green" },
+        { "offset": 2, "function": "blue" },
+        { "offset": 3, "function": "lime" },
+        { "offset": 4, "function": "amber" },
+        { "offset": 5, "function": "uv" }
+      ]
+    }
+  ]
+}

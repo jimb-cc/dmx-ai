@@ -76,31 +76,50 @@ class EnttecUSBPro:
 
 class SimOutput:
     """Drop-in replacement for EnttecUSBPro that draws the rig in the terminal
-    as four coloured blocks. Lets you tune scenes with no hardware attached.
+    as coloured blocks. Profile-aware: reads each fixture's actual channel
+    offsets so movers and battens approximate correctly too.
     """
 
-    def __init__(self, fixture_addrs, channels_per_fixture: int = 10):
-        self.addrs = list(fixture_addrs)
-        self.cpf = channels_per_fixture
+    # How a 6-emitter fixture's secondary colours fold into screen RGB.
+    _BLEND = {
+        "white": (0.95, 0.95, 0.95),
+        "lime":  (0.55, 0.95, 0.10),
+        "amber": (1.00, 0.55, 0.00),
+        "uv":    (0.30, 0.00, 0.95),
+    }
+
+    def __init__(self, fixtures):
+        # Per fixture: precompute the absolute channel index for each emitter.
+        self._fx = []
+        for f in fixtures:
+            base = f.base
+            offs = {}
+            for off, attr, is_col in getattr(f, "_plan", []):
+                if is_col:
+                    offs[attr] = base + off
+            self._fx.append((f.label, f.is_mover, offs))
 
     def send(self, universe) -> None:
         blocks = []
-        for addr in self.addrs:
-            base = addr - 1
-            master = universe[base] / 255.0
-            # Approximate the visible colour: RGB plus lime/amber/UV folded in.
-            r = universe[base + 1]
-            g = universe[base + 2]
-            b = universe[base + 3]
-            lime = universe[base + 4]
-            amber = universe[base + 5]
-            uv = universe[base + 6]
-            r = min(255, r + lime * 0.55 + amber * 1.00 + uv * 0.30)
-            g = min(255, g + lime * 0.95 + amber * 0.55)
-            b = min(255, b + lime * 0.10 + uv * 0.95)
-            r, g, b = (int(c * master) for c in (r, g, b))
-            blocks.append(f"\033[48;2;{r};{g};{b}m        \033[0m")
-        sys.stdout.write("\r " + "  ".join(blocks) + "  ")
+        for label, is_mover, offs in self._fx:
+            r = g = b = 0.0
+            for attr, idx in offs.items():
+                v = universe[idx]
+                if attr == "r":
+                    r += v
+                elif attr == "g":
+                    g += v
+                elif attr == "b":
+                    b += v
+                else:
+                    br, bg, bb = self._BLEND.get(attr, (0, 0, 0))
+                    r += v * br
+                    g += v * bg
+                    b += v * bb
+            r, g, b = (min(255, int(c)) for c in (r, g, b))
+            tag = "▲" if is_mover else " "
+            blocks.append(f"\033[48;2;{r};{g};{b}m {tag}      \033[0m")
+        sys.stdout.write("\r " + " ".join(blocks) + "  ")
         sys.stdout.flush()
 
     def blackout(self) -> None:

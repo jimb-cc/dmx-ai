@@ -16,7 +16,7 @@ from flask import Flask, jsonify, request, send_from_directory
 
 import scenes
 from enttec import EnttecUSBPro, SimOutput
-from fixtures import CHANNELS, DEFAULT_ADDRESSES, build_rig
+from fixtures import DEFAULT_RIG, build_rig_from_addresses, build_rig_from_file
 from overlays import OverlayStack
 from scene import lift_floor
 from scheduler import MOODS, SceneScheduler
@@ -220,7 +220,13 @@ def api_frame():
         master=ctx.master,
         raw_mode=ctx.raw is not None,
         overlays=overlays.active_names(),
-        ch1_64=list(_last_frame[:64]),
+        # Per-fixture footprint dumps — easier to read than a flat 512-byte slice.
+        fixtures=[{
+            "id": f.id,
+            "address": f.address,
+            "profile": f.profile.id,
+            "channels": list(_last_frame[f.base:f.base + f.footprint]),
+        } for f in rig],
     )
 
 
@@ -277,19 +283,29 @@ def api_setlist_edit():
 
 def main():
     global scheduler, setlist, rig
-    p = argparse.ArgumentParser(description="DMX controller for 4× Betopper LPC1818")
+    p = argparse.ArgumentParser(description="DMX show controller")
     p.add_argument("--port", help="serial port for the Enttec (auto-detect if omitted)")
     p.add_argument("--sim", action="store_true", help="no hardware — draw to terminal")
     p.add_argument("--http-port", type=int, default=8080)
-    p.add_argument("--addresses", default=",".join(map(str, DEFAULT_ADDRESSES)),
-                   help="comma-separated DMX base addresses (default 1,17,33,49)")
+    p.add_argument("--rig", default=None,
+                   help=f"path to a rig JSON (default: {DEFAULT_RIG})")
+    p.add_argument("--addresses", default=None,
+                   help="quick override: comma-separated DMX addresses, "
+                        "all assumed to be LPC1818 10ch (e.g. 1,17,33,49)")
     p.add_argument("--setlist", default="setlist.yaml", help="path to a setlist YAML")
     args = p.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    addresses = tuple(int(a) for a in args.addresses.split(","))
-    rig = build_rig(addresses)
+    if args.addresses:
+        addresses = tuple(int(a) for a in args.addresses.split(","))
+        rig = build_rig_from_addresses(addresses)
+        log.info("Rig: %d fixtures from --addresses override", len(rig))
+    else:
+        rig, rig_def = build_rig_from_file(args.rig)
+        log.info("Rig: %s — %d fixtures (%s)", rig_def.name, len(rig),
+                 ", ".join(f"{f.id}@{f.address}" for f in rig))
+
     scheduler = SceneScheduler(len(rig), scenes.REGISTRY, ctx)
     scheduler.set_auto("mixed")
     setlist = Setlist(args.setlist)
@@ -297,7 +313,7 @@ def main():
              len(setlist.to_dict()["songs"]))
 
     if args.sim:
-        out = SimOutput(addresses, CHANNELS)
+        out = SimOutput(rig)
         log.info("Running in simulator mode (terminal preview)")
     else:
         out = EnttecUSBPro(args.port)
