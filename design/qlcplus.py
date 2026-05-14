@@ -16,13 +16,25 @@ import os
 import re
 import sys
 
-# defusedxml protects against XXE / billion-laughs in uploaded .qxf files.
-# Fall back to stdlib if it's not installed (the Design app is a local tool
-# and the threat model is your own files, but defusedxml is cheap insurance).
+# defusedxml protects against XXE / billion-laughs in uploaded .qxf files —
+# .qxf files often come from forums and the QLC+ fixture site, not just your
+# own machine, so this is a real input boundary. If defusedxml isn't
+# available, fall back to stdlib but reject any input that contains a DTD
+# so the unsafe parser can't be exploited.
 try:
     from defusedxml import ElementTree as ET  # type: ignore
+    _SAFE_XML = True
 except ImportError:
     import xml.etree.ElementTree as ET
+    _SAFE_XML = False
+
+
+def _check_safe(xml_text: str) -> None:
+    if not _SAFE_XML and ("<!DOCTYPE" in xml_text or "<!ENTITY" in xml_text):
+        raise ValueError(
+            "this .qxf contains a DTD, which can't be parsed safely without "
+            "defusedxml — `pip install defusedxml` (it's in design/requirements.txt)"
+        )
 
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _root not in sys.path:
@@ -134,6 +146,7 @@ def _slug(s: str) -> str:
 
 def parse_qxf(xml_text: str) -> Profile:
     """Parse a QLC+ .qxf XML document into a Profile."""
+    _check_safe(xml_text)
     root = ET.fromstring(xml_text)
     ns = "" if "}" not in root.tag else root.tag.split("}")[0] + "}"
 
