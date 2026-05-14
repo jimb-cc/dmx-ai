@@ -44,7 +44,8 @@ DEFAULT_RIG = next(
 
 
 # Maps profile `function` names to (FixtureState attr, scale_by_master).
-# Colour channels are scaled by the software master/floor; non-colour aren't.
+# Colour channels are scaled by the software master; `dimmer` is too because
+# on colour-wheel fixtures it's the only intensity channel.
 _FUNC_TO_ATTR: dict[str, tuple[str, bool]] = {
     "red": ("r", True),
     "green": ("g", True),
@@ -56,7 +57,7 @@ _FUNC_TO_ATTR: dict[str, tuple[str, bool]] = {
     "amber": ("amber", True),
     "uv": ("uv", True),
     "strobe": ("strobe", False),
-    "dimmer": ("dimmer", False),
+    "dimmer": ("dimmer", True),
 }
 
 

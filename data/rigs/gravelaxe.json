@@ -14,10 +14,10 @@
     { "id": "BR", "label": "Back Right", "profile": "betopper-lpc1818", "mode": "10ch",
       "universe": 1, "address": 49, "x": 2.0, "y": 3.0, "z": 2.2,
       "facing_deg": 180, "tilt_deg": -10, "groups": ["back", "right", "pars"] },
-    { "id": "MOV1", "label": "Mover SL", "profile": "mini-ledspot", "mode": "11ch",
+    { "id": "MOV1", "label": "Mover SL", "profile": "uking-led-spot-100w", "mode": "9ch",
       "universe": 1, "address": 65, "x": -1.5, "y": 3.0, "z": 2.5,
       "facing_deg": 180, "tilt_deg": -45, "groups": ["movers", "left"] },
-    { "id": "MOV2", "label": "Mover SR", "profile": "mini-ledspot", "mode": "11ch",
+    { "id": "MOV2", "label": "Mover SR", "profile": "uking-led-spot-100w", "mode": "9ch",
       "universe": 1, "address": 81, "x": 1.5, "y": 3.0, "z": 2.5,
       "facing_deg": 180, "tilt_deg": -45, "groups": ["movers", "right"] }
   ]

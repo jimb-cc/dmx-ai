@@ -1,0 +1,40 @@
+{
+  "id": "uking-led-spot-100w",
+  "manufacturer": "UKing",
+  "model": "LED Spot Moving Head 100W",
+  "type": "mover",
+  "physical": {
+    "beam_deg": 15,
+    "pan_range_deg": 540,
+    "tilt_range_deg": 270,
+    "watts": 100,
+    "weight_kg": 3.1,
+    "luminous_flux_lm": 1700
+  },
+  "verified": false,
+  "_comment": "From the user's QLC+ profile. Colour-wheel mover, not RGB — colour wheel and gobo are locked open until phase 4 adds wheel support. CH8/CH9 (auto/other mode) are locked at 0 because we don't know what non-zero does and setting CH9 to the wrong value on cheap movers can trigger a reset mid-show. Verify with the /test channel sweep before relying on this.",
+  "modes": [
+    {
+      "id": "9ch",
+      "label": "9-channel",
+      "footprint": 16,
+      "channels": [
+        { "offset": 0, "function": "pan" },
+        { "offset": 1, "function": "tilt" },
+        { "offset": 2, "function": "color_wheel", "default": 0, "lock": true,
+          "label": "0 = open white" },
+        { "offset": 3, "function": "gobo", "default": 0, "lock": true,
+          "label": "0 = open" },
+        { "offset": 4, "function": "strobe" },
+        { "offset": 5, "function": "dimmer",
+          "label": "Brightness — the only intensity channel; scaled by master" },
+        { "offset": 6, "function": "pan_tilt_speed", "default": 0, "lock": true,
+          "label": "0 = fastest" },
+        { "offset": 7, "function": "macro", "default": 0, "lock": true,
+          "label": "Automatic mode — keep 0" },
+        { "offset": 8, "function": "reset", "default": 0, "lock": true,
+          "label": "'Other mode' — keep 0, may trigger reset if non-zero" }
+      ]
+    }
+  ]
+}
