@@ -75,7 +75,7 @@ class Setlist:
             songs = self._data.get("songs", [])
             if not (0 <= index < len(songs)):
                 return False
-            allowed = {"title", "artist", "section", "scene", "hue", "bpm", "notes"}
+            allowed = {"title", "artist", "section", "scene", "hue", "bpm", "notes", "choreo"}
             for k, v in fields.items():
                 if k in allowed:
                     if v in (None, ""):

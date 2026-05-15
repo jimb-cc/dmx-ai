@@ -55,11 +55,13 @@ make design          # Flask backend on :5050
 make design-front    # Vite dev server on :5173 (proxies /api → :5050)
 ```
 
-Two tabs:
+Three tabs:
 
 - **Inventory** — fixture profiles. Create/edit by hand, import a QLC+
   `.qxf`, or search the Open Fixture Library. Imports are flagged
-  *unverified* until you've run a hardware sweep — manuals lie.
+  *unverified* until you've run a hardware sweep — manuals lie. Verified
+  profiles get an **⬆ OFL** button that exports an OFL-format JSON to
+  upstream to the Open Fixture Library.
 - **Rigging** — top-down stage plot. Click a profile in the palette to add
   it, drag to position, drag the rotation handle to aim. Side panel for
   address / mode / groups; patch table below highlights conflicts in red.
@@ -67,6 +69,11 @@ Two tabs:
   one-page cheat sheet for the rigging crew. **Export package** bundles
   the rig + its profiles + the setlist into a zip — extract into
   `show/data/` on the Pi and restart.
+- **Setlist** — desktop editor for `show/setlist.yaml` with a live preview.
+  Pick a song, assign scene / hue / BPM / mover choreography, see what it
+  actually looks like — the backend runs the real Show app scene code
+  against the rig and animates the result on a stage plot. Saves straight
+  to the YAML the Pi reads.
 
 ```bash
 # on the Pi
@@ -136,14 +143,12 @@ is a no-op.
 ## Future / roadmap
 
 Done: repo split, profile-driven encoder, Inventory tab, Rigging tab + show
-package export, mover choreography layer.
+package export, mover choreography layer, Setlist tab + scene preview, OFL
+write-back.
 
 Next:
 - **Hardware verification** — sweep the UKing mover with `/test`, flip
   `"verified": true` once the channel map's confirmed; soundcheck the
   choreography home aim (`POST /api/choreo {"home_pan": .., "home_tilt": ..}`).
-- **Scene design tab** in the Design app — preview/edit scenes off the Pi.
-- **OFL write-back** — export verified profiles to Open Fixture Library
-  format for upstreaming.
 - **Sound reactivity** — mixer line-out → beat detection. Clean seam in
   `scheduler.py` if/when there's a reliable audio feed.

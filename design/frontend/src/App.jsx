@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import Inventory from './tabs/Inventory.jsx'
 import Rigging from './tabs/Rigging.jsx'
+import Setlist from './tabs/Setlist.jsx'
 
 const TABS = [
   { id: 'inventory', label: 'Inventory', component: Inventory },
   { id: 'rigging', label: 'Rigging', component: Rigging },
+  { id: 'setlist', label: 'Setlist', component: Setlist },
 ]
 
 export default function App() {

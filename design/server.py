@@ -23,6 +23,7 @@ if _root not in sys.path:
     sys.path.insert(0, _root)
 
 import ofl  # noqa: E402
+import preview  # noqa: E402
 import qlcplus  # noqa: E402
 from shared.package import build_package  # noqa: E402
 from shared.profile import FIXTURE_TYPES, FUNCTIONS, Profile, ProfileRegistry, validate  # noqa: E402
@@ -31,6 +32,7 @@ from shared.rig import Rig, save as save_rig  # noqa: E402
 DATA = os.path.join(_root, "data")
 PROFILES_DIR = os.path.join(DATA, "profiles")
 RIGS_DIR = os.path.join(DATA, "rigs")
+SETLIST_PATH = os.path.join(_root, "show", "setlist.yaml")
 FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "frontend", "dist")
 
 app = Flask(__name__)
@@ -160,6 +162,19 @@ def api_ofl_search():
         return jsonify(error=str(e)), 502
 
 
+@app.get("/api/profiles/<pid>/ofl")
+def api_profile_export_ofl(pid):
+    """Download an OFL-format JSON for upstreaming a verified profile."""
+    d = _load_profile(pid)
+    if d is None:
+        return jsonify(error="not found"), 404
+    out = ofl.to_ofl(Profile.from_dict(d))
+    body = json.dumps(out, indent=2, ensure_ascii=False) + "\n"
+    return Response(body, mimetype="application/json", headers={
+        "Content-Disposition": f"attachment; filename={_safe_slug(pid)}.ofl.json",
+    })
+
+
 @app.post("/api/ofl/import")
 def api_ofl_import():
     body = request.get_json(silent=True) or {}
@@ -262,6 +277,90 @@ def api_export(name):
     return Response(data, mimetype="application/zip", headers={
         "Content-Disposition": f"attachment; filename={_safe_slug(name)}-package.zip",
     })
+
+
+# -------------------------------------------------------------- setlist + preview
+
+@app.get("/api/setlist")
+def api_setlist_get():
+    """Read show/setlist.yaml. Same shape the Show app's Setlist class uses,
+    minus the `current` runtime field."""
+    import yaml
+    if not os.path.isfile(SETLIST_PATH):
+        return jsonify(name="Setlist", between={"scene": "warm"}, songs=[])
+    try:
+        with open(SETLIST_PATH, encoding="utf-8") as f:
+            d = yaml.safe_load(f) or {}
+    except Exception as e:
+        return jsonify(error=f"setlist parse failed: {e}"), 500
+    return jsonify(name=d.get("name", "Setlist"),
+                   between=d.get("between", {"scene": "warm"}),
+                   songs=list(d.get("songs", [])))
+
+
+# Output key order — matches the existing show/setlist.yaml so the first
+# Design-app save doesn't produce a noisy reorder-only diff.
+_SONG_KEYS = ("title", "artist", "section", "scene", "bpm", "hue", "choreo", "notes")
+
+
+def _clean_song(s: dict) -> dict:
+    """Drop empty/unknown fields so the YAML stays terse and hand-editable."""
+    out = {}
+    for k in _SONG_KEYS:
+        v = s.get(k)
+        if v in (None, "", 0) and k not in ("hue", "bpm"):
+            continue
+        if k in ("hue", "bpm") and not v:
+            continue
+        out[k] = v
+    return out
+
+
+@app.put("/api/setlist")
+def api_setlist_put():
+    import yaml
+    d = request.get_json(silent=True)
+    if not d or not isinstance(d.get("songs"), list):
+        return jsonify(error="bad JSON — need at least {songs: [...]}"), 400
+    out = {
+        "name": str(d.get("name", "Setlist")),
+        "between": _clean_song(d.get("between", {})) or {"scene": "warm"},
+        "songs": [_clean_song(s) for s in d["songs"]],
+    }
+    with open(SETLIST_PATH, "w", encoding="utf-8") as f:
+        yaml.safe_dump(out, f, sort_keys=False, allow_unicode=True,
+                       default_flow_style=False, width=120)
+    return jsonify(out)
+
+
+@app.get("/api/scenes")
+def api_scenes():
+    """The Show app's scene catalogue — name, label, mood, weight."""
+    return jsonify(scenes=preview.catalogue(), choreos=preview.choreo_catalogue())
+
+
+@app.get("/api/preview")
+def api_preview():
+    """Render N seconds of a scene against the rig and return per-fixture
+    screen-RGB frames. Cheap enough to call live as the user scrubs sliders."""
+    scene = request.args.get("scene", "")
+    try:
+        out = preview.render(
+            scene,
+            hue=float(request.args.get("hue", 0)),
+            bpm=float(request.args.get("bpm", 120)),
+            floor=float(request.args.get("floor", 0.12)),
+            secs=min(20.0, max(1.0, float(request.args.get("secs", 6)))),
+            fps=min(30, max(2, int(request.args.get("fps", 12)))),
+            choreo=request.args.get("choreo") or None,
+            rig_path=None,
+        )
+    except KeyError:
+        return jsonify(error=f"unknown scene {scene!r}"), 404
+    except Exception as e:
+        log.exception("preview failed")
+        return jsonify(error=f"preview failed: {e}"), 500
+    return jsonify(out)
 
 
 # --------------------------------------------------------------------- frontend

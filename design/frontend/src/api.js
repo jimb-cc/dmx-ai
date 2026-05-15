@@ -37,6 +37,8 @@ export const api = {
   ofl: {
     search: q => req('GET', `/api/ofl/search?q=${encodeURIComponent(q)}`).then(d => d.results),
     import: key => req('POST', '/api/ofl/import', { key }),
+    exportUrl: pid => `/api/profiles/${pid}/ofl`,
+    editorUrl: 'https://open-fixture-library.org/fixture-editor',
   },
 
   rigs: {
@@ -47,5 +49,17 @@ export const api = {
     autoPatch: (name, rig, start = 1, universe = 1) =>
       req('POST', `/api/rigs/${name}/auto_patch`, { rig, start, universe }),
     exportUrl: name => `/api/export/${name}`,
+  },
+
+  setlist: {
+    get: () => req('GET', '/api/setlist'),
+    save: sl => req('PUT', '/api/setlist', sl),
+  },
+
+  scenes: () => req('GET', '/api/scenes'),
+
+  preview: (scene, opts = {}) => {
+    const q = new URLSearchParams({ scene, ...opts }).toString()
+    return req('GET', `/api/preview?${q}`)
   },
 }

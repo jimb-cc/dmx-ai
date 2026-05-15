@@ -158,10 +158,25 @@ export default function Inventory() {
               </h2>
               <div className="row">
                 {!selected.verified && <span className="badge unverified">unverified — sweep before trusting</span>}
+                {selected.id && !dirty && (
+                  <button title="Download an OFL-format JSON for upstreaming to the Open Fixture Library — verify first, OFL is community-trusted"
+                          onClick={() => window.location.href = api.ofl.exportUrl(selected.id)}>
+                    ⬆ OFL
+                  </button>
+                )}
                 <button className="primary" onClick={save} disabled={!dirty}>Save</button>
                 {selected.id && <button className="danger" onClick={del}>Delete</button>}
               </div>
             </div>
+
+            {selected.verified && selected.id && !dirty && (
+              <div className="card" style={{ marginBottom: 16, fontSize: 13, color: 'var(--fg-dim)' }}>
+                Verified profile — public-spirited to upstream it.{' '}
+                <b>⬆ OFL</b> downloads an OFL-format JSON; paste it into the{' '}
+                <a href={api.ofl.editorUrl} target="_blank" rel="noreferrer">OFL fixture editor</a>{' '}
+                to fill in the missing physical/wheel details and submit.
+              </div>
+            )}
 
             <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr', marginBottom: 18 }}>
               <div className="col"><label>Manufacturer</label>
