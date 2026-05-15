@@ -55,6 +55,25 @@ make design          # Flask backend on :5050
 make design-front    # Vite dev server on :5173 (proxies /api → :5050)
 ```
 
+Two tabs:
+
+- **Inventory** — fixture profiles. Create/edit by hand, import a QLC+
+  `.qxf`, or search the Open Fixture Library. Imports are flagged
+  *unverified* until you've run a hardware sweep — manuals lie.
+- **Rigging** — top-down stage plot. Click a profile in the palette to add
+  it, drag to position, drag the rotation handle to aim. Side panel for
+  address / mode / groups; patch table below highlights conflicts in red.
+  Auto-patch reassigns addresses footprint-spaced. **Print sheet** gives a
+  one-page cheat sheet for the rigging crew. **Export package** bundles
+  the rig + its profiles + the setlist into a zip — extract into
+  `show/data/` on the Pi and restart.
+
+```bash
+# on the Pi
+unzip gravelaxe-package.zip -d ~/dmx-ai/show/data/
+sudo systemctl restart dmx-lights
+```
+
 ## Fixture setup (current GravelAxe rig)
 
 4× Betopper LPC1818, 10-channel mode, addresses on the rear display:

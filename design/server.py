@@ -16,7 +16,7 @@ import os
 import re
 import sys
 
-from flask import Flask, abort, jsonify, request, send_from_directory
+from flask import Flask, Response, abort, jsonify, request, send_from_directory
 
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _root not in sys.path:
@@ -24,6 +24,7 @@ if _root not in sys.path:
 
 import ofl  # noqa: E402
 import qlcplus  # noqa: E402
+from shared.package import build_package  # noqa: E402
 from shared.profile import FIXTURE_TYPES, FUNCTIONS, Profile, ProfileRegistry, validate  # noqa: E402
 from shared.rig import Rig, save as save_rig  # noqa: E402
 
@@ -220,6 +221,47 @@ def api_rig_put(name):
     errs = rig.validate()
     save_rig(rig, _rig_path(name))
     return jsonify(rig=rig.to_dict(), warnings=errs)
+
+
+@app.delete("/api/rigs/<name>")
+def api_rig_delete(name):
+    p = _rig_path(name)
+    if os.path.isfile(p):
+        os.remove(p)
+    return jsonify(ok=True)
+
+
+@app.post("/api/rigs/<name>/auto_patch")
+def api_rig_auto_patch(name):
+    """Run the canonical Python auto-patcher on the posted rig body and
+    return the result *without saving* — the frontend keeps the rig dirty
+    until the user hits Save. `name` is unused but kept for URL symmetry."""
+    _safe_slug(name)
+    d = request.get_json(silent=True)
+    if not d:
+        return jsonify(error="bad JSON"), 400
+    body = d.get("rig", d)
+    reg = ProfileRegistry(PROFILES_DIR)
+    rig = Rig.from_dict(body, reg)
+    rig.auto_patch(start=int(d.get("start", 1)), universe=int(d.get("universe", 1)))
+    return jsonify(rig=rig.to_dict(), warnings=rig.validate())
+
+
+@app.get("/api/export/<name>")
+def api_export(name):
+    """Bundle a saved rig + the profiles it uses into a show-package zip.
+    Extract into show/data/ on the Pi."""
+    p = _rig_path(name)
+    if not os.path.isfile(p):
+        return jsonify(error="not found"), 404
+    reg = ProfileRegistry(PROFILES_DIR)
+    with open(p, encoding="utf-8") as f:
+        rig = Rig.from_dict(json.load(f), reg)
+    setlist = os.path.join(_root, "show", "setlist.yaml")
+    data = build_package(rig, reg, setlist_path=setlist if os.path.isfile(setlist) else None)
+    return Response(data, mimetype="application/zip", headers={
+        "Content-Disposition": f"attachment; filename={_safe_slug(name)}-package.zip",
+    })
 
 
 # --------------------------------------------------------------------- frontend

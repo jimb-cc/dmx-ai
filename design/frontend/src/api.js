@@ -43,5 +43,9 @@ export const api = {
     list: () => req('GET', '/api/rigs').then(d => d.rigs),
     get: name => req('GET', `/api/rigs/${name}`),
     save: (name, rig) => req('PUT', `/api/rigs/${name}`, rig),
+    delete: name => req('DELETE', `/api/rigs/${name}`),
+    autoPatch: (name, rig, start = 1, universe = 1) =>
+      req('POST', `/api/rigs/${name}/auto_patch`, { rig, start, universe }),
+    exportUrl: name => `/api/export/${name}`,
   },
 }
