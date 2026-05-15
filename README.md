@@ -76,20 +76,27 @@ sudo systemctl restart dmx-lights
 
 ## Fixture setup (current GravelAxe rig)
 
-4× Betopper LPC1818, 10-channel mode, addresses on the rear display:
+`data/rigs/gravelaxe.json` — 4 pars + 2 movers, all on universe 1, patched
+16 apart:
 
-| Light | Display |
-|-------|---------|
-| FL    | `A001`  |
-| FR    | `A017`  |
-| BL    | `A033`  |
-| BR    | `A049`  |
+| ID   | Fixture                 | Mode  | DMX     | Display |
+|------|-------------------------|-------|---------|---------|
+| FL   | Betopper LPC1818        | 10ch  | 1–16    | `A001`  |
+| FR   | Betopper LPC1818        | 10ch  | 17–32   | `A017`  |
+| BL   | Betopper LPC1818        | 10ch  | 33–48   | `A033`  |
+| BR   | Betopper LPC1818        | 10ch  | 49–64   | `A049`  |
+| MOV1 | UKing LED Spot 100W     | 9ch   | 65–80   | `065`   |
+| MOV2 | UKing LED Spot 100W     | 9ch   | 81–96   | `081`   |
 
-> **Why 16 apart and not 10?** The manual says A001 mode is 10 channels.
-> It isn't — the fixture also reads CH11 as a colour-temperature override.
-> We zero CH11-16 explicitly and patch 16 apart so adjacent fixtures can't
-> tread on it. The `data/profiles/betopper-lpc1818.json` profile carries
-> this as `"footprint": 16` and a `"lock": true` on CH11.
+The same table prints from the Rigging tab's **Print sheet** button.
+
+> **Why 16 apart and not 10?** The LPC1818 manual says A001 mode is 10
+> channels. It isn't — the fixture also reads CH11 as a colour-temperature
+> override. We zero CH11-16 explicitly and patch 16 apart so adjacent
+> fixtures can't tread on it. The profile carries this as `"footprint": 16`
+> and a `"lock": true` on CH11. The UKing profile is **unverified** until
+> someone runs a sweep — its colour wheel, gobo, and "auto" channels are
+> locked at 0 in the meantime.
 
 ## Show app: scenes, overlays, faders
 
@@ -128,6 +135,15 @@ is a no-op.
 
 ## Future / roadmap
 
-The Design app is being built phase by phase — see the design docs.
-Sound reactivity (mixer line-out → beat detection) is a clean seam in
-`scheduler.py` if/when there's a reliable audio feed.
+Done: repo split, profile-driven encoder, Inventory tab, Rigging tab + show
+package export, mover choreography layer.
+
+Next:
+- **Hardware verification** — sweep the UKing mover with `/test`, flip
+  `"verified": true` once the channel map's confirmed; soundcheck the
+  choreography home aim (`POST /api/choreo {"home_pan": .., "home_tilt": ..}`).
+- **Scene design tab** in the Design app — preview/edit scenes off the Pi.
+- **OFL write-back** — export verified profiles to Open Fixture Library
+  format for upstreaming.
+- **Sound reactivity** — mixer line-out → beat detection. Clean seam in
+  `scheduler.py` if/when there's a reliable audio feed.
