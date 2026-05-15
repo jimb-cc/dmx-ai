@@ -51,6 +51,7 @@ class FixtureState:
         self.r = self.g = self.b = self.white = 0.0
         self.lime = self.amber = self.uv = 0.0
         self.strobe = 0
+        self.dimmer = 0.0  # mover's only intensity channel — off means off
         # leave pan/tilt — a mover going dark shouldn't snap to centre
 
     def copy_from(self, other: "FixtureState") -> None:

@@ -82,10 +82,12 @@ class SimOutput:
 
     # How a 6-emitter fixture's secondary colours fold into screen RGB.
     _BLEND = {
-        "white": (0.95, 0.95, 0.95),
-        "lime":  (0.55, 0.95, 0.10),
-        "amber": (1.00, 0.55, 0.00),
-        "uv":    (0.30, 0.00, 0.95),
+        "white":  (0.95, 0.95, 0.95),
+        "lime":   (0.55, 0.95, 0.10),
+        "amber":  (1.00, 0.55, 0.00),
+        "uv":     (0.30, 0.00, 0.95),
+        # Colour-wheel movers' only intensity channel — show as warm white.
+        "dimmer": (0.95, 0.85, 0.70),
     }
 
     def __init__(self, fixtures):

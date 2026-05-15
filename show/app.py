@@ -14,7 +14,9 @@ import time
 
 from flask import Flask, jsonify, request, send_from_directory
 
+import choreography
 import scenes
+from choreography import Choreographer
 from enttec import EnttecUSBPro, SimOutput
 from fixtures import DEFAULT_RIG, build_rig_from_addresses, build_rig_from_file
 from overlays import OverlayStack
@@ -76,6 +78,7 @@ _frame_count = [0]
 # Built in main() once we know the rig size and setlist path.
 scheduler: SceneScheduler | None = None
 setlist: Setlist | None = None
+choreo: Choreographer | None = None
 rig = []
 
 
@@ -100,6 +103,11 @@ def render_loop(out):
             wire = raw_buf
         else:
             states = scheduler.tick(dt)
+            # Mover choreography: drives pan/tilt + intensity for movers only,
+            # before floor lift (which never touches dimmer) and overlays
+            # (which can still kill the movers — blackout calls off()).
+            cur = scheduler.current
+            choreo.apply(states, dt, cur.mood if cur else "mixed")
             # Floor lift before overlays so a held blackout still goes dark.
             lift_floor(states, ctx.floor * scheduler.floor_k)
             overlays.apply(states)
@@ -146,6 +154,8 @@ def api_state():
         overlays=overlays.active_names(),
         moods=list(MOODS),
         scenes=scenes.catalogue(),
+        choreo=choreo.status(),
+        choreos=choreography.catalogue() if choreo.has_movers else [],
     )
 
 
@@ -191,6 +201,23 @@ def api_tempo():
     val = (request.get_json(silent=True) or {}).get("bpm", ctx.bpm)
     ctx.set_bpm(val)
     return jsonify(ok=True, bpm=ctx.bpm)
+
+
+@app.post("/api/choreo")
+def api_choreo():
+    """Set a mover choreography pattern, switch to auto, or tune the home aim.
+    Body: {"pattern": "sweep"} | {"auto": true} | {"home_pan": .5, "home_tilt": .4}"""
+    body = request.get_json(silent=True) or {}
+    if not choreo.has_movers:
+        return jsonify(ok=False, error="no movers in this rig"), 400
+    if body.get("auto"):
+        choreo.set_auto()
+    elif "pattern" in body:
+        if not choreo.set_pattern(body["pattern"]):
+            return jsonify(ok=False, error="unknown pattern"), 400
+    if "home_pan" in body or "home_tilt" in body:
+        choreo.set_home(body.get("home_pan"), body.get("home_tilt"))
+    return jsonify(ok=True, choreo=choreo.status())
 
 
 @app.post("/api/overlay")
@@ -249,6 +276,15 @@ def _apply_preset(preset: dict) -> None:
         scheduler.goto(scene, hue=float(preset.get("hue", 0) or 0))
     if preset.get("bpm"):
         ctx.set_bpm(preset["bpm"])
+    # Optional per-song mover choreography. "auto" returns to mood-driven
+    # rotation; an unknown name is ignored (don't break a song change on a
+    # typo in the YAML).
+    ch = preset.get("choreo")
+    if ch and choreo.has_movers:
+        if ch == "auto":
+            choreo.set_auto()
+        else:
+            choreo.set_pattern(ch)
 
 
 @app.post("/api/setlist/play")
@@ -282,7 +318,7 @@ def api_setlist_edit():
 # --------------------------------------------------------------------------- main
 
 def main():
-    global scheduler, setlist, rig
+    global scheduler, setlist, choreo, rig
     p = argparse.ArgumentParser(description="DMX show controller")
     p.add_argument("--port", help="serial port for the Enttec (auto-detect if omitted)")
     p.add_argument("--sim", action="store_true", help="no hardware — draw to terminal")
@@ -308,6 +344,11 @@ def main():
 
     scheduler = SceneScheduler(len(rig), scenes.REGISTRY, ctx)
     scheduler.set_auto("mixed")
+    choreo = Choreographer(rig, ctx)
+    if choreo.has_movers:
+        choreo.set_auto()
+        log.info("Choreography: %d movers (%s) — auto rotation",
+                 len(choreo.movers), ", ".join(m.label for m in choreo.movers))
     setlist = Setlist(args.setlist)
     log.info("Setlist: %s (%d songs)", setlist.to_dict()["name"],
              len(setlist.to_dict()["songs"]))

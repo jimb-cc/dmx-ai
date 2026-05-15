@@ -106,6 +106,26 @@ hardware dimmer is choppy). **Floor** fader sets a minimum ambient lift so the
 band is never in the dark on a pulse-y scene. **Hue** slider re-colours the
 running scene live. **Tap tempo** drives the beat-locked scenes.
 
+## Movers — choreography layer
+
+Scenes only think about colour. Pan/tilt for movers is driven by a separate
+**choreography layer** (`show/choreography.py`) that runs after the scene
+scheduler — same idea as the overlays. A small library of patterns (home,
+wash, sweep, fan, scan, crossfire, beat snap, circle), each carrying its own
+intensity envelope so movers read as accents, not constant light. Auto mode
+rotates patterns based on the running scene's mood; pick one manually from
+the **Movers** row in the Show UI; pin one per song with a `choreo:` field
+in the setlist.
+
+Patterns work in degrees-from-home and convert to channel values using each
+profile's `pan_range_deg` / `tilt_range_deg`, so a 30° sweep looks the same
+on a 540°-pan mover and a 270°-pan mover. Travel is clamped clear of the
+end-stops — slamming a cheap mover against its limit mid-show is loud.
+The home aim is tunable from the API without a restart.
+
+The choreo row only shows up if the rig has movers; without them the layer
+is a no-op.
+
 ## Future / roadmap
 
 The Design app is being built phase by phase — see the design docs.

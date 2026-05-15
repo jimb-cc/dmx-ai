@@ -51,6 +51,16 @@
   }
   .mood.active { background: #2c2c30; color: #fff; border-color: #555; }
 
+  /* Mover choreography pills */
+  #choreo-row { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .choreo {
+    padding: 8px 14px; border: 1px solid #333; border-radius: 999px; flex: none;
+    background: transparent; color: #aaa; font-size: .82rem; font-weight: 600;
+  }
+  .choreo.active { background: #2c2c30; color: #fff; border-color: #555; }
+  #choreo-auto { border: 0; background: #1d1d22; padding: 8px 12px; }
+  #choreo-auto.active { background: #fff; color: #000; }
+
   /* Scene grid */
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 14px; }
   button.scene {
@@ -146,6 +156,14 @@
   </div>
 
   <div class="grid" id="scenes"></div>
+
+  <div id="choreo-section" style="display:none">
+    <div class="section-label">Movers — choreography</div>
+    <div id="choreo-row">
+      <button id="choreo-auto" class="choreo">🤖 Auto</button>
+      <div class="moods" id="choreos"></div>
+    </div>
+  </div>
 
   <div class="section-label">Hue shift — re-colour the running scene</div>
   <div class="hue-row">
@@ -269,6 +287,36 @@ autoBtn.addEventListener("click", () => {
   post("/api/auto", { mood: currentMood });
 });
 
+// ------------------------------------------------------------------ choreography
+let CHOREOS = [];
+let choreoState = { pattern: "home", mode: "auto" };
+const choreoSection = document.getElementById("choreo-section");
+const choreoRow = document.getElementById("choreos");
+const choreoAutoBtn = document.getElementById("choreo-auto");
+
+function renderChoreos() {
+  if (CHOREOS.length === 0) { choreoSection.style.display = "none"; return; }
+  choreoSection.style.display = "";
+  choreoAutoBtn.classList.toggle("active", choreoState.mode === "auto");
+  choreoRow.replaceChildren();
+  for (const c of CHOREOS) {
+    const b = document.createElement("button");
+    b.className = "choreo" + (choreoState.mode === "manual" && c.name === choreoState.pattern ? " active" : "");
+    b.textContent = c.label;
+    b.addEventListener("click", () => {
+      choreoState = { pattern: c.name, mode: "manual" };
+      renderChoreos();
+      post("/api/choreo", { pattern: c.name });
+    });
+    choreoRow.appendChild(b);
+  }
+}
+choreoAutoBtn.addEventListener("click", () => {
+  choreoState.mode = "auto";
+  renderChoreos();
+  post("/api/choreo", { auto: true });
+});
+
 // ------------------------------------------------------------------ overlays
 const OVERLAYS = [
   ["strobe",   "⚡", "Strobe"],
@@ -382,13 +430,15 @@ function syncState(s) {
   if (!s) return;
   CATALOGUE = s.scenes || CATALOGUE;
   MOODS = s.moods || MOODS;
+  CHOREOS = s.choreos || CHOREOS;
   mode = s.mode; currentScene = s.scene; currentMood = s.mood;
+  if (s.choreo) choreoState = s.choreo;
   autoBtn.classList.toggle("active", mode === "auto");
   masterCtl.set(Math.round(s.master * 100));
   floorCtl.set(Math.round(s.floor * 100));
   tempoCtl.set(Math.round(s.bpm));
   hueCtl.set(Math.round(s.hue));
-  renderMoods(); renderScenes(); updateStatus();
+  renderMoods(); renderScenes(); renderChoreos(); updateStatus();
   conn.textContent = "● connected";
 }
 fetch("/api/state").then(r => r.json()).then(syncState).catch(() => conn.textContent = "✕ no connection");
@@ -398,6 +448,9 @@ setInterval(() => fetch("/api/state").then(r => r.json()).then(s => {
   if (mode === "auto") {
     if (s.scene !== currentScene) { currentScene = s.scene; updateStatus(); }
     hueCtl.set(Math.round(s.hue));
+  }
+  if (s.choreo && choreoState.mode === "auto" && s.choreo.pattern !== choreoState.pattern) {
+    choreoState = s.choreo; renderChoreos();
   }
 }).catch(() => {}), 5000);
 </script>
