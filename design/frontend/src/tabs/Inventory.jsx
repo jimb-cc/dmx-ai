@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 import ChannelTable from '../components/ChannelTable.jsx'
+import OflBrowser from '../components/OflBrowser.jsx'
 import Toast from '../components/Toast.jsx'
 
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
@@ -26,9 +27,6 @@ export default function Inventory() {
   const [selected, setSelected] = useState(null)   // working copy of the selected profile
   const [dirty, setDirty] = useState(false)
   const [toast, setToast] = useState(null)
-  const [oflQ, setOflQ] = useState('')
-  const [oflResults, setOflResults] = useState([])
-  const [oflBusy, setOflBusy] = useState(false)
   const fileRef = useRef()
 
   const refresh = () => api.profiles.list().then(setProfiles)
@@ -74,21 +72,10 @@ export default function Inventory() {
     } catch (e) { setToast({ msg: e.message, kind: 'err' }) }
   }
 
-  const oflSearch = async () => {
-    if (!oflQ.trim()) return
-    setOflBusy(true)
-    try { setOflResults(await api.ofl.search(oflQ)) }
-    catch (e) { setToast({ msg: e.message, kind: 'err' }); setOflResults([]) }
-    setOflBusy(false)
-  }
   const oflImport = async key => {
-    setOflBusy(true)
-    try {
-      const p = await api.ofl.import(key)
-      setToast({ msg: `Imported ${p.id} from OFL — verify before relying on it` })
-      refresh(); select(p); setOflResults([])
-    } catch (e) { setToast({ msg: e.message, kind: 'err' }) }
-    setOflBusy(false)
+    const p = await api.ofl.import(key)
+    setToast({ msg: `Imported ${p.id} from OFL — verify before relying on it` })
+    refresh(); select(p)
   }
 
   const m = selected?.modes?.[0]
@@ -106,22 +93,7 @@ export default function Inventory() {
                  onChange={e => { if (e.target.files[0]) importQxf(e.target.files[0]); e.target.value = '' }} />
         </div>
 
-        <div className="row" style={{ marginBottom: 12 }}>
-          <input placeholder="Search Open Fixture Library…" value={oflQ}
-                 onChange={e => setOflQ(e.target.value)}
-                 onKeyDown={e => e.key === 'Enter' && oflSearch()} style={{ flex: 1 }} />
-          <button onClick={oflSearch} disabled={oflBusy}>{oflBusy ? '…' : '🔎'}</button>
-        </div>
-        {oflResults.length > 0 && (
-          <div className="card" style={{ marginBottom: 12, maxHeight: 200, overflowY: 'auto' }}>
-            {oflResults.map(r => (
-              <div key={r.key} className="row spread" style={{ padding: '4px 0' }}>
-                <span style={{ fontSize: 13 }}>{r.manufacturer} <b>{r.model}</b></span>
-                <button className="small" onClick={() => oflImport(r.key)}>Import</button>
-              </div>
-            ))}
-          </div>
-        )}
+        <OflBrowser onImport={oflImport} onError={msg => setToast({ msg, kind: 'err' })} />
 
         <div className="grid">
           {profiles.map(p => (

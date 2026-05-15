@@ -162,6 +162,27 @@ def api_ofl_search():
         return jsonify(error=str(e)), 502
 
 
+@app.get("/api/ofl/manufacturers")
+def api_ofl_manufacturers():
+    """All OFL manufacturers, cached server-side for ~24h. `?refresh=1` busts
+    the cache."""
+    try:
+        return jsonify(manufacturers=ofl.manufacturers(force=request.args.get("refresh") == "1"))
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
+
+@app.get("/api/ofl/manufacturers/<slug>")
+def api_ofl_manufacturer_fixtures(slug):
+    """All fixtures for one OFL manufacturer, cached. `?refresh=1` busts."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", slug):
+        return jsonify(error="bad manufacturer slug"), 400
+    try:
+        return jsonify(fixtures=ofl.fixtures_for(slug, force=request.args.get("refresh") == "1"))
+    except Exception as e:
+        return jsonify(error=str(e)), 502
+
+
 @app.get("/api/profiles/<pid>/ofl")
 def api_profile_export_ofl(pid):
     """Download an OFL-format JSON for upstreaming a verified profile."""

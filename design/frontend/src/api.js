@@ -36,6 +36,10 @@ export const api = {
 
   ofl: {
     search: q => req('GET', `/api/ofl/search?q=${encodeURIComponent(q)}`).then(d => d.results),
+    manufacturers: (refresh = false) =>
+      req('GET', `/api/ofl/manufacturers${refresh ? '?refresh=1' : ''}`).then(d => d.manufacturers),
+    fixtures: (slug, refresh = false) =>
+      req('GET', `/api/ofl/manufacturers/${slug}${refresh ? '?refresh=1' : ''}`).then(d => d.fixtures),
     import: key => req('POST', '/api/ofl/import', { key }),
     exportUrl: pid => `/api/profiles/${pid}/ofl`,
     editorUrl: 'https://open-fixture-library.org/fixture-editor',

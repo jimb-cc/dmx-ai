@@ -1,8 +1,15 @@
-"""Open Fixture Library search and import.
+"""Open Fixture Library search, browse, and import.
 
 OFL (https://open-fixture-library.org) is the largest open fixture database.
-We search via their public API and convert their JSON schema (which is much
-richer than ours) down to our simple `function`-based profile.
+We search and browse via their public API and convert their JSON schema
+(which is much richer than ours) down to our simple `function`-based profile.
+
+There's no "list all fixtures" endpoint, so the browse path is two levels:
+``GET /api/v1/manufacturers`` for the index and
+``GET /api/v1/manufacturers/<slug>`` for one manufacturer's fixtures. Both
+are cached on disk with a TTL so a session that flips through a dozen
+manufacturers makes a dozen requests, not hundreds. OFL is a volunteer
+project on free hosting — be a good citizen.
 
 Imported profiles are flagged unverified — community channel maps for cheap
 Chinese fixtures don't always match what your particular firmware does.
@@ -10,9 +17,12 @@ Chinese fixtures don't always match what your particular firmware does.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
+import threading
+import time
 
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _root not in sys.path:
@@ -28,14 +38,67 @@ except ImportError:
 OFL_API = "https://open-fixture-library.org/api/v1"
 OFL_RAW = "https://raw.githubusercontent.com/OpenLightingProject/open-fixture-library/master/fixtures"
 
+# OFL changes via GitHub PRs — daily is plenty fresh, and a long TTL is the
+# polite thing to do for a free community service.
+CACHE_PATH = os.path.join(_root, "data", ".ofl-cache.json")
+CACHE_TTL = 24 * 3600
+
 
 def _ensure_requests():
     if requests is None:
-        raise RuntimeError("OFL search needs the `requests` package — `pip install requests`")
+        raise RuntimeError("OFL needs the `requests` package — `pip install requests`")
 
+
+# ---------------------------------------------------------------------- cache
+
+_cache_lock = threading.Lock()
+_cache: dict | None = None
+
+
+def _load_cache() -> dict:
+    global _cache
+    if _cache is None:
+        try:
+            with open(CACHE_PATH, encoding="utf-8") as f:
+                _cache = json.load(f)
+        except Exception:
+            _cache = {"manufacturers": None, "fixtures": {}}
+        if not isinstance(_cache, dict):  # corrupt cache file
+            _cache = {"manufacturers": None, "fixtures": {}}
+    return _cache
+
+
+def _save_cache() -> None:
+    if _cache is None:
+        return
+    try:
+        os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
+        tmp = CACHE_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(_cache, f)
+        os.replace(tmp, CACHE_PATH)
+    except OSError:
+        pass  # cache is opportunistic — don't fail the request over it
+
+
+def _fresh(entry: dict | None) -> bool:
+    return bool(entry) and (time.time() - entry.get("at", 0)) < CACHE_TTL
+
+
+def clear_cache() -> None:
+    global _cache
+    with _cache_lock:
+        _cache = None
+        try:
+            os.remove(CACHE_PATH)
+        except OSError:
+            pass
+
+
+# ---------------------------------------------------------------- search/browse
 
 def search(query: str, limit: int = 25) -> list[dict]:
-    """Search OFL. Returns [{man, model, key, manKey}, ...]."""
+    """Free-text search. Returns [{key, manufacturer, model}, ...]."""
     _ensure_requests()
     r = requests.post(f"{OFL_API}/get-search-results",
                       json={"searchQuery": query, "manufacturersQuery": [],
@@ -48,6 +111,51 @@ def search(query: str, limit: int = 25) -> list[dict]:
         out.append({"key": key, "manufacturer": man.replace("-", " ").title(),
                     "model": fix.replace("-", " ").title()})
     return out
+
+
+def manufacturers(*, force: bool = False) -> list[dict]:
+    """All OFL manufacturers, cached for `CACHE_TTL`. Returns
+    [{slug, name, fixtureCount}, ...] sorted by name."""
+    with _cache_lock:
+        c = _load_cache()
+        if not force and _fresh(c.get("manufacturers")):
+            return c["manufacturers"]["data"]
+        _ensure_requests()
+        r = requests.get(f"{OFL_API}/manufacturers", timeout=15)
+        r.raise_for_status()
+        data = sorted(
+            ({"slug": k, "name": v["name"], "fixtureCount": v.get("fixtureCount", 0)}
+             for k, v in r.json().items() if not k.startswith("$")),
+            key=lambda m: m["name"].lower(),
+        )
+        c["manufacturers"] = {"at": time.time(), "data": data}
+        _save_cache()
+        return data
+
+
+def fixtures_for(slug: str, *, force: bool = False) -> list[dict]:
+    """All fixtures for one OFL manufacturer, cached. Returns
+    [{key, name, categories}, ...] sorted by name."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", slug):
+        raise ValueError(f"bad manufacturer slug {slug!r}")
+    with _cache_lock:
+        c = _load_cache()
+        entry = c.setdefault("fixtures", {}).get(slug)
+        if not force and _fresh(entry):
+            return entry["data"]
+        _ensure_requests()
+        r = requests.get(f"{OFL_API}/manufacturers/{slug}", timeout=15)
+        r.raise_for_status()
+        body = r.json()
+        data = sorted(
+            ({"key": f"{slug}/{f['key']}", "name": f.get("name", f["key"]),
+              "categories": f.get("categories", [])}
+             for f in body.get("fixtures", [])),
+            key=lambda f: f["name"].lower(),
+        )
+        c["fixtures"][slug] = {"at": time.time(), "data": data}
+        _save_cache()
+        return data
 
 
 def fetch(key: str) -> dict:

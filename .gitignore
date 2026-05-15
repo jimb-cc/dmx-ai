@@ -12,3 +12,6 @@ docs/
 # Show package lands here on the Pi — not in source control
 show/data/
 .claude/
+
+# OFL browse cache — fetched on demand, refreshed on a TTL
+data/.ofl-cache.json

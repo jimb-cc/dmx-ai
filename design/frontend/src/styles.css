@@ -96,6 +96,12 @@ td input, td select { width: 100%; }
 .split > .left { width: 320px; flex: none; border-right: 1px solid var(--border); overflow-y: auto; }
 .split > .right { flex: 1; overflow-y: auto; }
 
+/* -------------------------------------------------------------- OFL browser */
+
+.ofl-browser select { width: 100%; }
+.ofl-result { padding: 5px 0; border-bottom: 1px solid var(--border); }
+.ofl-result:last-child { border-bottom: none; }
+
 /* ------------------------------------------------------------- rigging tab */
 
 .card.warn { border-color: var(--warn); color: var(--warn); font-size: 13px; }
