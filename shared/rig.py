@@ -28,6 +28,11 @@ class RigFixture:
     facing_deg: float = 0.0
     tilt_deg: float = -10.0
     groups: list[str] = field(default_factory=list)
+    # Skip the master-fader scaling on this fixture's intensity. A 100W spot
+    # already looks weak next to four LED pars at point-blank range — turning
+    # it down further with the master makes it disappear. Set per-rig because
+    # it depends on the room and the brightness mix, not the fixture itself.
+    ignore_master: bool = False
 
     @classmethod
     def from_dict(cls, d: dict) -> "RigFixture":
@@ -44,16 +49,20 @@ class RigFixture:
             facing_deg=float(d.get("facing_deg", 0.0)),
             tilt_deg=float(d.get("tilt_deg", -10.0)),
             groups=list(d.get("groups", [])),
+            ignore_master=bool(d.get("ignore_master", False)),
         )
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "id": self.id, "label": self.label, "profile": self.profile,
             "mode": self.mode, "universe": self.universe, "address": self.address,
             "x": self.x, "y": self.y, "z": self.z,
             "facing_deg": self.facing_deg, "tilt_deg": self.tilt_deg,
             "groups": self.groups,
         }
+        if self.ignore_master:
+            d["ignore_master"] = True
+        return d
 
 
 @dataclass

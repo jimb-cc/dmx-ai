@@ -69,7 +69,8 @@ class Fixture:
     """One physical fixture — encodes a FixtureState into the wire frame."""
 
     def __init__(self, fx_id: str, profile: Profile, mode_id: str, address: int,
-                 *, label: str = "", groups: list[str] | None = None):
+                 *, label: str = "", groups: list[str] | None = None,
+                 ignore_master: bool = False):
         self.id = fx_id
         self.label = label or fx_id
         self.profile = profile
@@ -78,6 +79,10 @@ class Fixture:
         self.address = address
         self.groups = list(groups or [])
         self.is_mover = profile.type == "mover"
+        # Per-rig override: write intensity at full instead of scaling by the
+        # master fader. Useful for a fixture that's already much dimmer than
+        # the rest of the rig.
+        self.ignore_master = ignore_master
 
         chan = build_channel_map(profile, mode_id)
         self.footprint = profile.mode(mode_id).footprint
@@ -115,12 +120,13 @@ class Fixture:
 
     def encode(self, st, master_k: float, frame: bytearray) -> None:
         b = self.base
+        k = 1.0 if self.ignore_master else master_k
         for off, attr, scale in self._plan:
             v = getattr(st, attr)
             if attr == "strobe":
                 frame[b + off] = max(0, min(255, int(v)))
             elif scale:
-                frame[b + off] = _byte(v * master_k)
+                frame[b + off] = _byte(v * k)
             else:
                 frame[b + off] = _byte(v)
         if self._pan is not None:
@@ -148,7 +154,9 @@ def build_rig_from_file(rig_path: str | None = None,
     if errs:
         raise ValueError(f"rig {rig.name!r} invalid:\n  " + "\n  ".join(errs))
     fixtures = [Fixture(f.id, profiles.get(f.profile), f.mode, f.address,
-                        label=f.label, groups=f.groups) for f in rig.fixtures]
+                        label=f.label, groups=f.groups,
+                        ignore_master=getattr(f, "ignore_master", False))
+                for f in rig.fixtures]
     return fixtures, rig
 
 

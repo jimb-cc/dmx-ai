@@ -40,12 +40,19 @@ from utils import in_out_sine
 # scene crossfades — a snap-to-home on every scene change reads as a glitch.
 XFADE_SECONDS = 1.8
 AUTO_ROTATE_SECONDS = (90.0, 180.0)
-LIMIT_MARGIN = 0.45  # ±fraction of pan/tilt range we let patterns reach
+END_MARGIN = 0.02  # stay this fraction of channel clear of the end-stops
 
-# Default home aim — pointing into the band, slightly down. Tunable from the
-# UI without a restart; persisted per-rig later if it turns out to matter.
-HOME_PAN = 0.5
-HOME_TILT = 0.42
+# Default home aim — channel-fraction, i.e. 0.0 is DMX value 0. The GravelAxe
+# movers sit on their base on the floor with pan/tilt 0,0 pointing straight
+# at the audience, so 0,0 is the right default for this rig. A truss-hung
+# mover would want 0.5/0.5. Tunable live from the Show UI without a restart;
+# persisted per-rig is a TODO if it varies between rigs.
+HOME_PAN = 0.0
+HOME_TILT = 0.0
+# How much of the available pan/tilt headroom the patterns use. 1.0 = bang
+# up to the end-stop margins. Live-tunable too — dial it down if a pattern
+# overshoots the stage.
+SPREAD = 0.85
 
 
 @dataclass
@@ -76,20 +83,27 @@ def _home(t, m, ctx):
     return 0.0, 0.0, 0.0
 
 
+# Amplitudes are physical degrees of head travel from home. First studio
+# session showed the initial values were laughably conservative — a 540°-pan
+# mover doing ±32° looked like it was barely awake. These are sized for a
+# small-club rig where the heads should be obviously *doing something*; the
+# LIMIT_MARGIN clamp (±45% of range = ±243° on a 540° head) keeps even the
+# big swings clear of the end-stops.
+
 def _wash(t, m, ctx):
     # Aimed at the band, gentle slow swell. The "movers as extra wash" cue.
-    swell = 0.45 + 0.35 * (0.5 - 0.5 * math.cos(t * 0.35 + m.frac * math.pi))
+    swell = 0.7 + 0.3 * (0.5 - 0.5 * math.cos(t * 0.35 + m.frac * math.pi))
     return 0.0, 0.0, swell
 
 
 def _sweep(t, m, ctx):
-    # Slow side-to-side, opposite phases so they cross. Pulses brighter when
-    # the head is moving fast (mid-sweep) — same trick a real LD uses.
-    period = 12.0
+    # Side-to-side, opposite phases so they cross. Pulses brighter when the
+    # head is moving fast (mid-sweep) — same trick a real LD uses.
+    period = 8.0
     ph = t * math.tau / period + m.frac * math.pi
-    pan = math.sin(ph) * 32.0
-    tilt = math.sin(ph * 0.5) * 6.0
-    inten = 0.35 + 0.55 * abs(math.cos(ph))
+    pan = math.sin(ph) * 180.0
+    tilt = math.sin(ph * 0.5) * 35.0
+    inten = 0.6 + 0.4 * abs(math.cos(ph))
     return pan, tilt, inten
 
 
@@ -97,20 +111,20 @@ def _fan(t, m, ctx):
     # Movers spread outward symmetrically, slow breathe in/out. Looks like
     # the rig opening up — good "big chorus" cue.
     spread = (m.frac - 0.5) * 2.0   # -1..+1
-    breathe = 0.55 + 0.45 * (0.5 - 0.5 * math.cos(t * 0.22))
-    pan = spread * 42.0 * breathe
-    tilt = -8.0 + breathe * 14.0
-    return pan, tilt, 0.7 + 0.3 * breathe
+    breathe = 0.55 + 0.45 * (0.5 - 0.5 * math.cos(t * 0.3))
+    pan = spread * 200.0 * breathe
+    tilt = -25.0 + breathe * 50.0
+    return pan, tilt, 0.8 + 0.2 * breathe
 
 
 def _scan(t, m, ctx):
     # Audience scan: tilt up, pan sweeps the room. The "you're at a show" cue.
     # Use sparingly — blinding the punters reads as aggressive.
-    period = 16.0
+    period = 10.0
     ph = t * math.tau / period + m.frac * 0.6
-    pan = math.sin(ph) * 55.0
-    tilt = 36.0 + math.sin(ph * 0.4) * 8.0
-    return pan, tilt, 0.85
+    pan = math.sin(ph) * 220.0
+    tilt = 80.0 + math.sin(ph * 0.4) * 20.0
+    return pan, tilt, 1.0
 
 
 def _crossfire(t, m, ctx):
@@ -120,11 +134,11 @@ def _crossfire(t, m, ctx):
     bar = beat * 8
     flip = -1.0 if (t % (bar * 2)) >= bar else 1.0
     spread = (m.frac - 0.5) * 2.0
-    pan = -spread * 48.0 * flip
-    tilt = -4.0
+    pan = -spread * 200.0 * flip
+    tilt = -15.0
     # Punch on the bar boundary.
     phase = (t % bar) / bar
-    inten = 0.5 + 0.5 * math.exp(-phase * 3.0)
+    inten = 0.7 + 0.3 * math.exp(-phase * 3.0)
     return pan, tilt, inten
 
 
@@ -135,21 +149,21 @@ def _beatsnap(t, m, ctx):
     bar = beat * 4
     n = int(t / bar)
     rng = random.Random(n * 7919 + m.index * 104729)
-    pan = (rng.random() * 2 - 1) * 50.0
-    tilt = (rng.random() * 2 - 1) * 24.0
+    pan = (rng.random() * 2 - 1) * 240.0
+    tilt = (rng.random() * 2 - 1) * 70.0
     phase = (t % bar) / bar
-    inten = 0.25 + 0.75 * math.exp(-phase * 5.0)
+    inten = 0.4 + 0.6 * math.exp(-phase * 5.0)
     return pan, tilt, inten
 
 
 def _circle(t, m, ctx):
     # Each head traces a slow circle, opposite directions. Atmospheric.
-    period = 18.0
+    period = 12.0
     direction = 1.0 if m.frac < 0.5 else -1.0
     ph = t * math.tau / period * direction + m.frac * math.pi
-    pan = math.cos(ph) * 26.0
-    tilt = math.sin(ph) * 16.0
-    return pan, tilt, 0.6
+    pan = math.cos(ph) * 130.0
+    tilt = math.sin(ph) * 55.0
+    return pan, tilt, 0.85
 
 
 # name -> (fn, label, moods it suits, auto weight)
@@ -167,6 +181,26 @@ PATTERNS: dict[str, tuple] = {
 
 def catalogue() -> list[dict]:
     return [{"name": n, "label": v[1], "moods": list(v[2])} for n, v in PATTERNS.items()]
+
+
+def _to_channel(deg: float, home: float, range_deg: float, spread: float) -> float:
+    """Map a pattern's degrees-from-home to a 0..1 channel value.
+
+    Home is where the head sits at rest (offset = 0). Patterns swing the
+    head ±degrees around home, scaled by `spread`. The result clamps clear
+    of the channel end-stops; when home is right at a limit the swing is
+    one-sided. Move the home slider toward the middle of the range if you
+    want the full arc.
+
+    First version had a "smart" bias toward the centre of available headroom
+    so a one-sided home still got a full arc — but the bias cancelled the
+    home setting completely (every home value resolved to channel ~128,
+    which on a floor-standing mover is straight up). Lesson learned: the
+    home slider should do exactly what it says.
+    """
+    rng = max(1.0, range_deg)
+    n = home + (deg * spread) / rng
+    return max(END_MARGIN, min(1.0 - END_MARGIN, n))
 
 
 # ------------------------------------------------------------------- choreographer
@@ -201,6 +235,7 @@ class Choreographer:
         self._auto_until = 0.0
         self.home_pan = HOME_PAN
         self.home_tilt = HOME_TILT
+        self.spread = SPREAD
 
     @property
     def has_movers(self) -> bool:
@@ -221,12 +256,15 @@ class Choreographer:
             self.mode = "auto"
             self._auto_until = 0.0
 
-    def set_home(self, pan: float | None = None, tilt: float | None = None) -> None:
+    def set_home(self, pan: float | None = None, tilt: float | None = None,
+                 spread: float | None = None) -> None:
         with self._lock:
             if pan is not None:
                 self.home_pan = max(0.0, min(1.0, float(pan)))
             if tilt is not None:
                 self.home_tilt = max(0.0, min(1.0, float(tilt)))
+            if spread is not None:
+                self.spread = max(0.05, min(2.0, float(spread)))
 
     def status(self) -> dict:
         with self._lock:
@@ -236,6 +274,7 @@ class Choreographer:
                 "movers": len(self.movers),
                 "home_pan": self.home_pan,
                 "home_tilt": self.home_tilt,
+                "spread": self.spread,
             }
 
     # ------------------------------------------------------------- render loop
@@ -260,7 +299,7 @@ class Choreographer:
             self._xfade_t = min(1.0, self._xfade_t + dt / XFADE_SECONDS)
             k = in_out_sine(self._xfade_t)
             inv = 1.0 - k
-            hp, ht = self.home_pan, self.home_tilt
+            hp, ht, spread = self.home_pan, self.home_tilt, self.spread
 
             for m in self.movers:
                 pd, td, inten = fn(self.t, m, self.ctx)
@@ -270,15 +309,9 @@ class Choreographer:
                     td = ft * inv + td * k
                     inten = fi * inv + inten * k
                 m.pan, m.tilt, m.inten = pd, td, inten
-                # Degrees-from-home → 0..1 channel value, clamped clear of the
-                # physical end-stops.
-                pan_n = hp + pd / max(1.0, m.pan_range)
-                tilt_n = ht + td / max(1.0, m.tilt_range)
-                pan_n = max(hp - LIMIT_MARGIN, min(hp + LIMIT_MARGIN, pan_n))
-                tilt_n = max(ht - LIMIT_MARGIN, min(ht + LIMIT_MARGIN, tilt_n))
                 st = states[m.index]
-                st.pan = max(0.0, min(1.0, pan_n))
-                st.tilt = max(0.0, min(1.0, tilt_n))
+                st.pan = _to_channel(pd, hp, m.pan_range, spread)
+                st.tilt = _to_channel(td, ht, m.tilt_range, spread)
                 st.dimmer = max(0.0, min(1.0, st.dimmer * inten))
 
     # ---------------------------------------------------------------- internals

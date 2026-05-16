@@ -215,8 +215,8 @@ def api_choreo():
     elif "pattern" in body:
         if not choreo.set_pattern(body["pattern"]):
             return jsonify(ok=False, error="unknown pattern"), 400
-    if "home_pan" in body or "home_tilt" in body:
-        choreo.set_home(body.get("home_pan"), body.get("home_tilt"))
+    if any(k in body for k in ("home_pan", "home_tilt", "spread")):
+        choreo.set_home(body.get("home_pan"), body.get("home_tilt"), body.get("spread"))
     return jsonify(ok=True, choreo=choreo.status())
 
 
@@ -237,6 +237,32 @@ def api_raw():
     body = request.get_json(silent=True) or {}
     ctx.set_raw(body.get("channels"))
     return jsonify(ok=True)
+
+
+@app.get("/api/rig")
+def api_rig():
+    """Static rig description for the test page — fixtures with their channel
+    functions so the sweeper can label sliders and group by fixture."""
+    out = []
+    for f in rig:
+        mode = f.profile.mode(f.mode_id)
+        by_off = {c.offset: c for c in mode.channels}
+        locked = dict(f.locked)
+        chans = []
+        for i in range(f.footprint):
+            c = by_off.get(i)
+            chans.append({
+                "ch": f.address + i,
+                "function": c.function if c else "—",
+                "label": c.label if c else "",
+                "lock": locked.get(i),
+            })
+        out.append({"id": f.id, "label": f.label, "address": f.address,
+                    "footprint": f.footprint, "profile": f.profile.id,
+                    "model": f"{f.profile.manufacturer} {f.profile.model}".strip(),
+                    "type": f.profile.type, "is_mover": f.is_mover,
+                    "verified": f.profile.verified, "channels": chans})
+    return jsonify(fixtures=out, max_channel=max((f.address + f.footprint - 1 for f in rig), default=16))
 
 
 @app.get("/api/frame")

@@ -11,35 +11,54 @@
          font-family: -apple-system, system-ui, sans-serif; }
   h1 { font-size: 1rem; margin: 0 0 4px; }
   p  { margin: 0 0 16px; opacity: .6; font-size: .85rem; }
-  .ch { display: grid; grid-template-columns: 56px 1fr 48px; align-items: center;
-        gap: 12px; margin: 6px 0; }
-  .ch label { font-variant-numeric: tabular-nums; opacity: .8; }
+  .ch { display: grid; grid-template-columns: 56px 90px 1fr 48px; align-items: center;
+        gap: 10px; margin: 5px 0; }
+  .ch label { font-variant-numeric: tabular-nums; opacity: .8; font-size: .9rem; }
+  .ch .fn { font-size: .75rem; opacity: .55; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; }
+  .ch .fn.lock { color: #e0a020; opacity: .9; }
   .ch output { text-align: right; font-variant-numeric: tabular-nums; opacity: .9; }
   input[type=range] { width: 100%; height: 36px; }
   .row { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
   button { padding: 12px 18px; border: 0; border-radius: 8px; background: #2a2a2a;
            color: #fff; font-size: .95rem; }
   button.warn { background: #5a1010; }
+  button.small { padding: 6px 12px; font-size: .8rem; }
   a { color: #8ab4ff; }
+
+  details.fixture { margin: 14px 0; border: 1px solid #2a2a2a; border-radius: 10px; }
+  details.fixture summary {
+    padding: 12px 14px; cursor: pointer; list-style: none;
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  }
+  details.fixture summary::-webkit-details-marker { display: none; }
+  details.fixture summary::before { content: "▸"; opacity: .5; transition: transform .15s; }
+  details.fixture[open] summary::before { transform: rotate(90deg); }
+  details.fixture summary b { font-size: 1rem; }
+  details.fixture summary .meta { opacity: .55; font-size: .8rem; }
+  details.fixture summary .badge {
+    font-size: .7rem; padding: 2px 8px; border-radius: 999px;
+    background: rgba(224,160,32,.2); color: #e0a020;
+  }
+  details.fixture .body { padding: 0 14px 14px; }
+  .fxbtns { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
 <h1>🔬 DMX Channel Tester</h1>
-<p>CH1 starts at 255 (master open). Move one slider at a time and watch the light.<br>
-   When you're done, go <a href="/">back to the show</a>.</p>
+<p>Open a fixture, move one slider at a time, watch the light. Locked channels start at their pinned default.<br>
+   When you're done, <button class="warn small" id="exit">exit test mode</button> or go <a href="/">back to the show</a>.</p>
 
 <div class="row">
   <button id="zero">All → 0</button>
-  <button id="full">All → 255</button>
-  <button class="warn" id="exit">Exit test mode</button>
 </div>
 
-<div id="channels"></div>
+<div id="fixtures"></div>
 
 <script>
-const N = 16;  // first 16 channels
-const wrap = document.getElementById("channels");
-const vals = {};
+const wrap = document.getElementById("fixtures");
+const vals = {};   // ch (1-based) -> value
+const sliders = []; // {inp, out, ch}
 
 function send() {
   const channels = {};
@@ -50,32 +69,92 @@ function send() {
 let timer = null;
 const sendDebounced = () => { clearTimeout(timer); timer = setTimeout(send, 50); };
 
-const sliders = [];
-for (let i = 1; i <= N; i++) {
-  const start = (i === 1) ? 255 : 0;  // CH1 = master, open it so colours are visible
-  vals[i] = start;
+function setCh(ch, v) {
+  vals[ch] = v;
+  const s = sliders.find(s => s.ch === ch);
+  if (s) { s.inp.value = v; s.out.textContent = v; }
+}
+
+function makeSlider(c) {
+  const start = c.lock ?? 0;
+  vals[c.ch] = start;
   const row = document.createElement("div"); row.className = "ch";
-  const lab = document.createElement("label"); lab.textContent = "CH" + i;
+  const lab = document.createElement("label");
+  lab.textContent = "CH" + c.ch;
+  lab.title = `offset ${c.ch - 1}`;
+  const fn = document.createElement("span");
+  fn.className = "fn" + (c.lock != null ? " lock" : "");
+  fn.textContent = (c.function === "—" ? "" : c.function) + (c.lock != null ? " 🔒" : "");
+  fn.title = c.label || c.function;
   const inp = document.createElement("input"); inp.type = "range"; inp.min = 0; inp.max = 255; inp.value = start;
   const out = document.createElement("output"); out.textContent = "" + start;
-  inp.addEventListener("input", () => { vals[i] = +inp.value; out.textContent = inp.value; sendDebounced(); });
-  row.append(lab, inp, out); wrap.append(row);
-  sliders.push({inp, out, i});
+  inp.addEventListener("input", () => { vals[c.ch] = +inp.value; out.textContent = inp.value; sendDebounced(); });
+  row.append(lab, fn, inp, out);
+  sliders.push({inp, out, ch: c.ch});
+  return row;
+}
+
+function buildFixture(f, idx) {
+  const det = document.createElement("details"); det.className = "fixture";
+  if (idx === 0) det.open = true;
+  const sum = document.createElement("summary");
+  const idEl = document.createElement("b"); idEl.textContent = f.id;
+  const meta = document.createElement("span"); meta.className = "meta";
+  meta.textContent = `${f.model} · ${f.type} · DMX ${f.address}–${f.address + f.footprint - 1}`;
+  sum.append(idEl, meta);
+  if (!f.verified) {
+    const badge = document.createElement("span"); badge.className = "badge";
+    badge.textContent = "unverified"; sum.append(badge);
+  }
+  det.append(sum);
+  const body = document.createElement("div"); body.className = "body";
+
+  // Per-fixture quick buttons.
+  const btns = document.createElement("div"); btns.className = "fxbtns";
+  const home = document.createElement("button"); home.className = "small"; home.textContent = "Defaults";
+  home.onclick = e => { e.preventDefault(); f.channels.forEach(c => setCh(c.ch, c.lock ?? 0)); send(); };
+  const open = document.createElement("button"); open.className = "small"; open.textContent = "Open dimmer";
+  open.onclick = e => { e.preventDefault();
+    f.channels.forEach(c => { if (["master_dimmer","dimmer"].includes(c.function)) setCh(c.ch, 255); });
+    send(); };
+  const off = document.createElement("button"); off.className = "small"; off.textContent = "Zero this fixture";
+  off.onclick = e => { e.preventDefault(); f.channels.forEach(c => setCh(c.ch, 0)); send(); };
+  btns.append(home, open, off);
+  if (f.is_mover) {
+    const ctr = document.createElement("button"); ctr.className = "small"; ctr.textContent = "Centre + open";
+    ctr.onclick = e => { e.preventDefault();
+      f.channels.forEach(c => {
+        if (c.function === "pan" || c.function === "tilt") setCh(c.ch, 128);
+        else if (["master_dimmer","dimmer"].includes(c.function)) setCh(c.ch, 255);
+        else setCh(c.ch, c.lock ?? 0);
+      });
+      send(); };
+    btns.append(ctr);
+  }
+  body.append(btns);
+
+  for (const c of f.channels) body.append(makeSlider(c));
+  det.append(body);
+  return det;
 }
 
 document.getElementById("zero").onclick = () => {
-  sliders.forEach(s => { s.inp.value = 0; s.out.textContent = "0"; vals[s.i] = 0; }); send();
-};
-document.getElementById("full").onclick = () => {
-  sliders.forEach(s => { s.inp.value = 255; s.out.textContent = "255"; vals[s.i] = 255; }); send();
+  sliders.forEach(s => { s.inp.value = 0; s.out.textContent = "0"; vals[s.ch] = 0; }); send();
 };
 document.getElementById("exit").onclick = () => {
   fetch("/api/raw", { method: "POST", headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ channels: null }) });
 };
 
-// Enter test mode: blackout everything
-send();
+fetch("/api/rig").then(r => r.json()).then(d => {
+  d.fixtures.forEach((f, i) => wrap.append(buildFixture(f, i)));
+  send();  // enter test mode with fixture defaults applied
+}).catch(() => {
+  // No rig API (older server) — fall back to a flat 32-channel sweeper.
+  for (let i = 1; i <= 32; i++)
+    wrap.append(makeSlider({ ch: i, function: "—", label: "", lock: null }));
+  send();
+});
 </script>
 </body>
 </html>

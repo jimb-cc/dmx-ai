@@ -60,6 +60,11 @@
   .choreo.active { background: #2c2c30; color: #fff; border-color: #555; }
   #choreo-auto { border: 0; background: #1d1d22; padding: 8px 12px; }
   #choreo-auto.active { background: #fff; color: #000; }
+  #choreo-tune { margin-bottom: 14px; border: 1px solid #2a2a2a; border-radius: 10px; }
+  #choreo-tune summary { padding: 10px 14px; font-size: .8rem; opacity: .6; cursor: pointer; list-style: none; }
+  #choreo-tune summary::before { content: "▸ "; }
+  #choreo-tune[open] summary::before { content: "▾ "; }
+  #choreo-tune .faders { padding: 0 14px 12px; }
 
   /* Scene grid */
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 14px; }
@@ -163,6 +168,23 @@
       <button id="choreo-auto" class="choreo">🤖 Auto</button>
       <div class="moods" id="choreos"></div>
     </div>
+    <details id="choreo-tune">
+      <summary>Aim &amp; spread — DMX home position + how far patterns swing</summary>
+      <div class="faders">
+        <div class="fader">
+          <label>Pan home <b><span id="hpval">0</span></b></label>
+          <input type="range" id="hpan" min="0" max="255" value="0">
+        </div>
+        <div class="fader">
+          <label>Tilt home <b><span id="htval">0</span></b></label>
+          <input type="range" id="htilt" min="0" max="255" value="0">
+        </div>
+        <div class="fader">
+          <label>Spread <b><span id="spval">85</span>%</b></label>
+          <input type="range" id="spread" min="5" max="200" value="85">
+        </div>
+      </div>
+    </details>
   </div>
 
   <div class="section-label">Hue shift — re-colour the running scene</div>
@@ -317,6 +339,16 @@ choreoAutoBtn.addEventListener("click", () => {
   post("/api/choreo", { auto: true });
 });
 
+const hpanCtl = throttledFader(
+  document.getElementById("hpan"), document.getElementById("hpval"),
+  v => post("/api/choreo", { home_pan: v / 255 }));
+const htiltCtl = throttledFader(
+  document.getElementById("htilt"), document.getElementById("htval"),
+  v => post("/api/choreo", { home_tilt: v / 255 }));
+const spreadCtl = throttledFader(
+  document.getElementById("spread"), document.getElementById("spval"),
+  v => post("/api/choreo", { spread: v / 100 }));
+
 // ------------------------------------------------------------------ overlays
 const OVERLAYS = [
   ["strobe",   "⚡", "Strobe"],
@@ -432,7 +464,12 @@ function syncState(s) {
   MOODS = s.moods || MOODS;
   CHOREOS = s.choreos || CHOREOS;
   mode = s.mode; currentScene = s.scene; currentMood = s.mood;
-  if (s.choreo) choreoState = s.choreo;
+  if (s.choreo) {
+    choreoState = s.choreo;
+    hpanCtl.set(Math.round((s.choreo.home_pan ?? 0) * 255));
+    htiltCtl.set(Math.round((s.choreo.home_tilt ?? 0) * 255));
+    spreadCtl.set(Math.round((s.choreo.spread ?? 0.85) * 100));
+  }
   autoBtn.classList.toggle("active", mode === "auto");
   masterCtl.set(Math.round(s.master * 100));
   floorCtl.set(Math.round(s.floor * 100));
